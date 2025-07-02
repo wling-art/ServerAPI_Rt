@@ -1,8 +1,13 @@
 use axum::{ extract::{ Path, Query, State, Extension }, Json };
 use serde::Deserialize;
 use crate::{
-    errors::{ ApiError, ApiResult },
-    schemas::servers::{ ServerDetail, ServerListResponse },
+    errors::{ ApiError, ApiResult, ApiErrorResponse },
+    schemas::servers::{
+        ServerDetail,
+        ServerListResponse,
+        create_example_server_detail,
+        create_example_server_list_response,
+    },
     services::{ auth::Claims, database::DatabaseConnection, server::ServerService },
 };
 
@@ -53,8 +58,21 @@ pub struct ListQuery {
     get,
     path = "/v2/servers",
     responses(
-        (status = 200, description = "Servers list", body = ServerListResponse),
-        (status = 400, description = "Bad request", body = ApiErrorResponse)
+        (
+            status = 200,
+            description = "成功获取服务器列表",
+            body = ServerListResponse,
+            example = json!(serde_json::to_value(create_example_server_list_response()).unwrap()),
+        ),
+        (
+            status = 400,
+            description = "请求参数错误",
+            body = ApiErrorResponse,
+            example = json!({
+             "error": "page 与 page_size 不能小于 1",
+             "status": 400
+         }),
+        )
     ),
     tag = "servers",
     params(ListQuery)
@@ -89,8 +107,27 @@ pub async fn list_servers(
     get,
     path = "/v2/servers/{id}",
     responses(
-        (status = 200, description = "Server detail", body = ServerDetail),
-        (status = 404, description = "Server not found", body = ApiErrorResponse)
+        (status = 200,
+         description = "成功获取服务器详细信息",
+         body = ServerDetail,
+         example = json!(serde_json::to_value(create_example_server_detail()).unwrap())
+        ),
+        (status = 404,
+         description = "服务器不存在",
+         body = ApiErrorResponse,
+         example = json!(serde_json::to_value(ApiErrorResponse {
+             error: "服务器不存在".to_string(),
+             status: 404,
+         }).unwrap())
+        ),
+        (status = 401,
+         description = "未登录或无权限访问",
+         body = ApiErrorResponse,
+         example = json!(serde_json::to_value(ApiErrorResponse {
+             error: "未登录，禁止访问".to_string(),
+             status: 401,
+         }).unwrap())
+        )
     ),
     tag = "servers",
     params(("id" = u64, Path, description = "服务器 ID"),

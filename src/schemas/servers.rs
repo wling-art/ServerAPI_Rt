@@ -72,6 +72,15 @@ pub struct ServerListResponse {
     pub total_pages: i64,
 }
 
+/// 创建一个用于文档示例的 ServerListResponse 实例
+pub fn create_example_server_list_response() -> ServerListResponse {
+    ServerListResponse {
+        data: vec![create_example_server_detail()],
+        total: 100,
+        total_pages: 10,
+    }
+}
+
 /// 服务器详细信息
 ///
 /// 包含服务器完整信息的结构体，用于API响应
@@ -107,6 +116,30 @@ pub struct ServerDetail {
     pub cover_url: Option<String>,
 }
 
+/// 创建一个用于文档示例的 ServerDetail 实例
+pub fn create_example_server_detail() -> ServerDetail {
+    let mut players = HashMap::new();
+    players.insert("online".to_string(), 10);
+    players.insert("max".to_string(), 100);
+
+    ServerDetail {
+        id: 1,
+        name: "我的世界服务器".to_string(),
+        ip: Some("mc.example.com:25565".to_string()),
+        r#type: ApiServerType::Java,
+        version: "1.20.1".to_string(),
+        desc: "一个有趣的生存服务器".to_string(),
+        link: "https://example.com".to_string(),
+        is_member: true,
+        auth_mode: ApiAuthMode::Official,
+        is_hide: false,
+        tags: Some(vec!["生存".to_string(), "PVP".to_string()]),
+        status: Some(create_example_server_status()),
+        permission: "guest".to_string(),
+        cover_url: Some("https://{我是 CDN 网站}/static/covers/server1.jpg".to_string()),
+    }
+}
+
 /// 服务器状态信息
 ///
 /// 包含服务器实时状态的结构体，如在线玩家数、延迟等
@@ -124,6 +157,21 @@ pub struct ServerStatus {
     pub icon: Option<String>,
 }
 
+/// 创建一个用于文档示例的 ServerStatus 实例
+pub fn create_example_server_status() -> ServerStatus {
+    let mut players = HashMap::new();
+    players.insert("online".to_string(), 10);
+    players.insert("max".to_string(), 100);
+
+    ServerStatus {
+        players,
+        delay: 50.5,
+        version: "Paper 1.20.1".to_string(),
+        motd: create_example_motd(),
+        icon: Some("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA...".to_string()),
+    }
+}
+
 /// 服务器MOTD信息
 ///
 /// 包含不同格式的服务器消息的结构体
@@ -137,4 +185,14 @@ pub struct Motd {
     pub minecraft: String,
     /// ANSI 格式 MOTD，显示 ANSI 格式的 MOTD
     pub ansi: String,
+}
+
+/// 创建一个用于文档示例的 Motd 实例
+pub fn create_example_motd() -> Motd {
+    Motd {
+        plain: "欢迎来到我的世界服务器".to_string(),
+        html: "<span style='color: green;'>欢迎来到我的世界服务器</span>".to_string(),
+        minecraft: "§a欢迎来到我的世界服务器".to_string(),
+        ansi: "\\u001b[32m欢迎来到我的世界服务器\\u001b[0m".to_string(),
+    }
 }
