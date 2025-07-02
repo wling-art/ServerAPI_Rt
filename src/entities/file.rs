@@ -1,0 +1,44 @@
+use sea_orm::entity::prelude::*;
+use serde::{ Deserialize, Serialize };
+use utoipa::ToSchema;
+
+#[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq, Serialize, Deserialize, ToSchema)]
+#[sea_orm(table_name = "files")]
+pub struct Model {
+    #[sea_orm(primary_key, auto_increment = false)]
+    pub hash_value: String,
+    #[sea_orm(unique)]
+    pub file_path: String,
+}
+
+#[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+pub enum Relation {
+    #[sea_orm(has_many = "super::user::Entity")]
+    Users,
+    #[sea_orm(has_many = "super::server::Entity")]
+    Servers,
+}
+
+impl Related<super::user::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::Users.def()
+    }
+}
+
+impl Related<super::server::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::Servers.def()
+    }
+}
+
+impl ActiveModelBehavior for ActiveModel {}
+
+impl Model {
+    /// Generate file hash from content
+    pub fn generate_file_hash(file_content: &[u8]) -> String {
+        use sha2::{ Digest, Sha256 };
+        let mut hasher = Sha256::new();
+        hasher.update(file_content);
+        format!("{:x}", hasher.finalize())
+    }
+}
