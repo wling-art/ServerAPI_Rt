@@ -316,3 +316,11 @@ pub struct SuccessResponse {
     #[schema(example = "操作成功")]
     pub message: String,
 }
+
+/// 服务器总玩家数响应
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct ServerTotalPlayers {
+    /// 服务器总玩家数
+    #[schema(example = 1234)]
+    pub total_players: i32,
+}

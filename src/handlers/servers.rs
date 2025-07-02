@@ -2,7 +2,7 @@ use crate::{
     errors::{ApiError, ApiErrorResponse, ApiResult},
     schemas::servers::{
         GalleryImageRequest, GalleryImageSchema, ServerDetail, ServerGallery, ServerListResponse,
-        ServerManagersResponse, SuccessResponse, UpdateServerRequest,
+        ServerManagersResponse, ServerTotalPlayers, SuccessResponse, UpdateServerRequest,
     },
     services::{auth::Claims, database::DatabaseConnection, server::ServerService},
 };
@@ -472,4 +472,29 @@ pub async fn delete_gallery_image(
     Ok(Json(serde_json::json!({
         "message": "成功删除服务器画册图片"
     })))
+}
+
+/// 获取所有服务器玩家总数
+#[utoipa::path(
+    get,
+    path = "/v2/servers/players",
+    responses(
+        (
+            status = 200,
+            description = "成功获取所有服务器玩家总数",
+            body = ServerTotalPlayers,
+        ),
+        (
+            status = 500,
+            description = "服务器内部错误",
+            body = ApiErrorResponse,
+        )
+    ),
+    tag = "servers"
+)]
+pub async fn get_total_players(
+    State(db): State<DatabaseConnection>,
+) -> ApiResult<Json<ServerTotalPlayers>> {
+    let result = ServerService::total_players(&db).await?;
+    Ok(Json(result))
 }

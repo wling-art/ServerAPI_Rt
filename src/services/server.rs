@@ -974,4 +974,33 @@ impl ServerService {
 
         Ok(())
     }
+
+    /// 获取所有服务器的玩家总数
+    pub async fn total_players(
+        db: &DatabaseConnection,
+    ) -> ApiResult<crate::schemas::servers::ServerTotalPlayers> {
+        let server_statuses = ServerStatusEntity::find()
+            .select_only()
+            .column(server_status::Column::StatData)
+            .all(db.as_ref())
+            .await
+            .map_err(|e| crate::errors::ApiError::Database(e.to_string()))?;
+
+        let mut total_players = 0i32;
+
+        for server_status in server_statuses {
+            if let Some(stat_data) = &server_status.stat_data {
+                // 解析 JSON 数据中的玩家信息
+                if let Some(players_obj) = stat_data.get("players") {
+                    if let Some(online_players) = players_obj.get("online") {
+                        if let Some(online_count) = online_players.as_i64() {
+                            total_players += online_count as i32;
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(crate::schemas::servers::ServerTotalPlayers { total_players })
+    }
 }

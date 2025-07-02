@@ -8,7 +8,11 @@ pub mod schemas;
 pub mod services;
 
 use crate::handlers::servers;
-use axum::{middleware as axum_middleware, routing::{get, delete}, Router};
+use axum::{
+    middleware as axum_middleware,
+    routing::{delete, get},
+    Router,
+};
 use tower_http::cors::CorsLayer;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
@@ -25,7 +29,8 @@ use crate::services::database::DatabaseConnection;
         servers::get_server_managers,
         servers::get_server_gallery,
         servers::upload_gallery_image,
-        servers::delete_gallery_image
+        servers::delete_gallery_image,
+        servers::get_total_players
     ),
     components(
         schemas(
@@ -42,6 +47,7 @@ use crate::services::database::DatabaseConnection;
             schemas::servers::GalleryImage,
             schemas::servers::GalleryImageRequest,
             schemas::servers::SuccessResponse,
+            schemas::servers::ServerTotalPlayers,
             entities::server::AuthModeEnum,
             entities::server::ServerTypeEnum,
             crate::errors::ApiErrorResponse,
@@ -56,6 +62,7 @@ pub fn create_app(db: DatabaseConnection) -> Router {
     Router::new()
         // Server routes with optional authentication
         .route("/v2/servers", get(servers::list_servers))
+        .route("/v2/servers/players", get(servers::get_total_players))
         .route(
             "/v2/servers/{server_id}",
             get(servers::get_server_detail).put(servers::update_server),
