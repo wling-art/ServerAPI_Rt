@@ -31,6 +31,8 @@ pub enum ApiError {
     #[error("Internal server error: {0}")] Internal(String),
 
     #[error("Bad request: {0}")] BadRequest(String),
+
+    #[error("Unauthorized: {0}")] Unauthorized(String),
 }
 
 impl IntoResponse for ApiError {
@@ -50,6 +52,7 @@ impl IntoResponse for ApiError {
                 (StatusCode::INTERNAL_SERVER_ERROR, "Internal server error".to_string())
             }
             ApiError::BadRequest(msg) => (StatusCode::BAD_REQUEST, msg.clone()),
+            ApiError::Unauthorized(msg) => (StatusCode::UNAUTHORIZED, msg.clone()),
         };
 
         let body = Json(

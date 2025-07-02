@@ -165,8 +165,14 @@ impl ServerService {
     pub async fn get_server_detail(
         db: &DatabaseConnection,
         user_id: Option<i32>,
-        server_id: u64
+        server_id: u64,
+        require_login: bool
     ) -> ApiResult<ServerDetail> {
+        // 如果强制要求登录但未提供 user_id，直接返回未登录错误
+        if require_login && user_id.is_none() {
+            return Err(crate::errors::ApiError::Unauthorized("未登录，禁止访问".to_string()));
+        }
+
         // 查询服务器基本信息
         let server = ServerEntity::find_by_id(server_id as i32)
             .one(db.as_ref()).await?
@@ -202,6 +208,13 @@ impl ServerService {
             }
         )?;
 
+        // user_role 处理
+        let user_role = user_server.map(|us| us.role);
+        // 如果强制要求登录但 user_role 仍为 None，说明用户无权限
+        if require_login && user_role.is_none() {
+            return Err(crate::errors::ApiError::Unauthorized("无权限访问该服务器".to_string()));
+        }
+
         // 转换为 ServerDetail
         let status = if let Some(status_model) = server_status {
             if let Some(ref stat_data) = status_model.stat_data {
@@ -228,8 +241,6 @@ impl ServerService {
         } else {
             None
         };
-
-        let user_role = user_server.map(|us| us.role);
 
         Ok(ServerDetail {
             id: server.id,

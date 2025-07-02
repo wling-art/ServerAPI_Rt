@@ -93,16 +93,20 @@ pub async fn list_servers(
         (status = 404, description = "Server not found", body = ApiErrorResponse)
     ),
     tag = "servers",
-    params(("id" = u64, Path, description = "服务器 ID"))
+    params(("id" = u64, Path, description = "服务器 ID"),
+            ("full_info" = Option<bool>, Query, description = "是否返回完整信息(需要登录)"))
 )]
 pub async fn get_server_detail(
     State(db): State<DatabaseConnection>,
     Path(id): Path<u64>,
+    Query(full_info): Query<Option<bool>>,
     user_claims: Option<Extension<Claims>>
 ) -> ApiResult<Json<ServerDetail>> {
     let user_id = user_claims.map(|Extension(claims)| claims.id);
 
-    let result = ServerService::get_server_detail(&db, user_id, id).await?;
+    let full_info = full_info.unwrap_or(false);
+
+    let result = ServerService::get_server_detail(&db, user_id, id, full_info).await?;
 
     Ok(Json(result))
 }
