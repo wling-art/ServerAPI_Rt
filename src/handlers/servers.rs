@@ -1,6 +1,8 @@
 use crate::{
     errors::{ApiError, ApiErrorResponse, ApiResult},
-    schemas::servers::{ServerDetail, ServerListResponse, UpdateServerRequest},
+    schemas::servers::{
+        ServerDetail, ServerListResponse, ServerManagersResponse, UpdateServerRequest,
+    },
     services::{auth::Claims, database::DatabaseConnection, server::ServerService},
 };
 use axum::{
@@ -224,4 +226,35 @@ pub async fn update_server(
             .await?;
 
     Ok(Json(updated_server))
+}
+
+/// 获取服务器管理员列表
+#[utoipa::path(
+    get,
+    path = "/v2/servers/{server_id}/managers",
+    responses(
+        (
+            status = 200,
+            description = "成功获取服务器管理员列表",
+            body = ServerManagersResponse,
+        ),
+        (
+            status = 404,
+            description = "服务器不存在",
+            body = ApiErrorResponse,
+            example = json!({
+                "error": "服务器不存在",
+                "status": 404
+            }),
+        )
+    ),
+    tag = "servers",
+    params(("server_id" = i32, Path, description = "服务器 ID"))
+)]
+pub async fn get_server_managers(
+    State(db): State<DatabaseConnection>,
+    Path(server_id): Path<i32>,
+) -> ApiResult<Json<ServerManagersResponse>> {
+    let result = ServerService::get_server_managers(&db, server_id).await?;
+    Ok(Json(result))
 }

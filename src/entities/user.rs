@@ -35,7 +35,7 @@ pub struct Model {
     pub email: String,
     pub display_name: String,
     pub hashed_password: String,
-    pub avatar_hash: Option<String>,
+    pub avatar_hash_id: Option<String>,
     pub role: RoleEnum,
     pub is_active: bool,
     #[schema(value_type = String, format = DateTime)]
@@ -49,7 +49,7 @@ pub struct Model {
 pub enum Relation {
     #[sea_orm(
         belongs_to = "super::file::Entity",
-        from = "Column::AvatarHash",
+        from = "Column::AvatarHashId",
         to = "super::file::Column::HashValue",
         on_update = "Cascade",
         on_delete = "SetNull"

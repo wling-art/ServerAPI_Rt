@@ -207,3 +207,37 @@ pub struct UpdateServerRequest {
     #[schema(value_type = String, format = Binary)]
     pub cover: Option<FieldData<axum::body::Bytes>>,
 }
+/// 服务器管理员角色
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub enum ServerManagerRole {
+    /// 服主
+    #[serde(rename = "owner")]
+    Owner,
+    /// 管理员
+    #[serde(rename = "admin")]
+    Admin,
+}
+
+/// 管理员信息
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct ManagerInfo {
+    /// 用户ID
+    pub id: i32,
+    /// 显示名称
+    pub display_name: String,
+    /// 角色 (owner/admin)
+    pub role: ServerManagerRole,
+    /// 是否活跃
+    pub is_active: bool,
+    /// 头像URL
+    pub avatar_url: String,
+}
+
+/// 服务器管理员列表响应
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct ServerManagersResponse {
+    /// 服主列表
+    pub owners: Vec<ManagerInfo>,
+    /// 管理员列表
+    pub admins: Vec<ManagerInfo>,
+}

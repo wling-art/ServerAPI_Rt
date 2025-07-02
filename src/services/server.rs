@@ -4,7 +4,7 @@ use sea_orm::*;
 use serde_json::Value;
 use validator::Validate;
 
-use crate::entities::{server, ServerEntity};
+use crate::entities::{server, ServerEntity, UserEntity};
 use crate::services::FileUploadService;
 use crate::{
     entities::{
@@ -13,7 +13,8 @@ use crate::{
     errors::ApiResult,
     handlers::servers::ListQuery,
     schemas::servers::{
-        ApiAuthMode, ApiServerType, Motd, ServerDetail, ServerStatus, UpdateServerRequest,
+        ApiAuthMode, ApiServerType, ManagerInfo, Motd, ServerDetail, ServerManagerRole,
+        ServerManagersResponse, ServerStatus, UpdateServerRequest,
     },
     services::database::DatabaseConnection,
 };
@@ -420,13 +421,7 @@ impl ServerService {
         cover_hash
             .as_ref()
             .and_then(|hash| cover_file_map.get(hash))
-            .map(|file_path| {
-                if file_path.starts_with("http://") || file_path.starts_with("https://") {
-                    file_path.clone()
-                } else {
-                    format!("/static/{}", file_path)
-                }
-            })
+            .map(|file_path| file_path.clone())
     }
 
     /// 解析服务器状态JSON为ServerStatus结构
@@ -602,5 +597,94 @@ impl ServerService {
                 "无权限编辑该服务器".to_string(),
             )),
         }
+    }
+
+    /// 获取服务器管理员列表
+    pub async fn get_server_managers(
+        db: &DatabaseConnection,
+        server_id: i32,
+    ) -> ApiResult<ServerManagersResponse> {
+        // 首先验证服务器是否存在
+        let _server = ServerEntity::find_by_id(server_id)
+            .one(db.as_ref())
+            .await?
+            .ok_or_else(|| crate::errors::ApiError::NotFound("服务器不存在".to_string()))?;
+
+        // 查询服务器的管理员关系，同时关联用户信息
+        let managers = UserServerEntity::find()
+            .filter(user_server::Column::ServerId.eq(server_id))
+            .find_also_related(UserEntity)
+            .all(db.as_ref())
+            .await?;
+
+        // 收集所有的头像hash，用于批量查询文件信息
+        let avatar_hashes: Vec<String> = managers
+            .iter()
+            .filter_map(|(_, user_opt)| {
+                user_opt
+                    .as_ref()
+                    .and_then(|user| user.avatar_hash_id.clone())
+            })
+            .collect();
+
+        // 批量查询头像文件信息
+        let avatar_files = if !avatar_hashes.is_empty() {
+            FileEntity::find()
+                .filter(file::Column::HashValue.is_in(avatar_hashes))
+                .all(db.as_ref())
+                .await?
+        } else {
+            vec![]
+        };
+
+        // 构建头像文件映射表
+        let avatar_file_map: HashMap<String, String> = avatar_files
+            .iter()
+            .map(|file_model| (file_model.hash_value.clone(), file_model.file_path.clone()))
+            .collect();
+
+        let mut owners = Vec::new();
+        let mut admins = Vec::new();
+
+        for (user_server_relation, user_opt) in managers {
+            if let Some(user) = user_opt {
+                // 构建头像URL
+                let avatar_url = if let Some(avatar_hash_id) = &user.avatar_hash_id {
+                    let file_path = avatar_file_map.get(avatar_hash_id).ok_or_else(|| {
+                        crate::errors::ApiError::Internal(format!(
+                            "头像文件不存在: {}",
+                            avatar_hash_id
+                        ))
+                    })?;
+
+                    file_path.clone()
+                } else {
+                    return Err(crate::errors::ApiError::Internal(
+                        "用户缺少头像信息".to_string(),
+                    ));
+                };
+
+                let role = match user_server_relation.role.as_str() {
+                    "owner" => ServerManagerRole::Owner,
+                    "admin" => ServerManagerRole::Admin,
+                    _ => continue, // 跳过未知角色
+                };
+
+                let manager_info = ManagerInfo {
+                    id: user.id,
+                    display_name: user.display_name,
+                    role: role.clone(),
+                    is_active: user.is_active,
+                    avatar_url,
+                };
+
+                match role {
+                    ServerManagerRole::Owner => owners.push(manager_info),
+                    ServerManagerRole::Admin => admins.push(manager_info),
+                }
+            }
+        }
+
+        Ok(ServerManagersResponse { owners, admins })
     }
 }
