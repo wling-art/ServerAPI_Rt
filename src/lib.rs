@@ -16,9 +16,9 @@ use axum::{
 use tower_http::cors::CorsLayer;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
-
 use crate::middleware::{auth::optional_auth_middleware, simple_http_logging_middleware};
 use crate::services::database::DatabaseConnection;
+use crate::services::auth::SecurityAddon;
 
 #[derive(OpenApi)]
 #[openapi(
@@ -54,6 +54,7 @@ use crate::services::database::DatabaseConnection;
             crate::errors::ApiError
         )
     ),
+    modifiers(&SecurityAddon),
     tags((name = "servers", description = "Server management endpoints"))
 )]
 pub struct ApiDoc;

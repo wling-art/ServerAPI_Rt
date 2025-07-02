@@ -113,3 +113,28 @@ impl AuthService {
         redis.exists(&key).await
     }
 }
+
+
+use utoipa::{
+    Modify,
+    openapi::security::{HttpAuthScheme, HttpBuilder, SecurityScheme},
+};
+
+pub struct SecurityAddon;
+
+impl Modify for SecurityAddon {
+    fn modify(&self, openapi: &mut utoipa::openapi::OpenApi) {
+        // components 一定要存在，不然先创建一个
+        let components = openapi.components.get_or_insert(Default::default());
+
+        components.add_security_scheme(
+            "bearer_auth",                     // ← ② 安全方案的名字
+            SecurityScheme::Http(              // ← ③ 方案类型：HTTP
+                HttpBuilder::new()
+                    .scheme(HttpAuthScheme::Bearer) // ← ④ Bearer
+                    .bearer_format("JWT")           // ← ⑤ 文档说明，可省
+                    .build(),
+            ),
+        );
+    }
+}

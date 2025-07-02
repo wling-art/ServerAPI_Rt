@@ -84,7 +84,11 @@ pub struct ServerDetailQuery {
         )
     ),
     tag = "servers",
-    params(ListQuery)
+    params(ListQuery),
+    security(
+        (),
+        ("bearer_auth" = [])
+    )
 )]
 pub async fn list_servers(
     State(db): State<DatabaseConnection>,
@@ -139,7 +143,11 @@ pub async fn list_servers(
     ),
     tag = "servers",
     params(("server_id" = i32, Path, description = "服务器 ID"),
-           ServerDetailQuery)
+           ServerDetailQuery),
+    security(
+        (),
+        ("bearer_auth" = [])
+    )
 )]
 pub async fn get_server_detail(
     State(db): State<DatabaseConnection>,
@@ -198,7 +206,10 @@ pub async fn get_server_detail(
         )
     ),
     tag = "servers",
-    params(("server_id" = i32, Path, description = "服务器 ID"))
+    params(("server_id" = i32, Path, description = "服务器 ID")),
+    security(
+        ("bearer_auth" = [])
+    )
 )]
 pub async fn update_server(
     State(db): State<DatabaseConnection>,
@@ -350,7 +361,10 @@ pub async fn get_server_gallery(
         )
     ),
     tag = "servers",
-    params(("server_id" = i32, Path, description = "服务器ID"))
+    params(("server_id" = i32, Path, description = "服务器ID")),
+    security(
+        ("bearer_auth" = [])
+    )
 )]
 pub async fn upload_gallery_image(
     State(db): State<DatabaseConnection>,
@@ -441,6 +455,9 @@ pub async fn upload_gallery_image(
     params(
         ("server_id" = i32, Path, description = "服务器ID"),
         ("image_id" = i32, Path, description = "图片ID")
+    ),
+    security(
+        ("bearer_auth" = [])
     )
 )]
 pub async fn delete_gallery_image(
