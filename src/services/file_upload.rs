@@ -231,4 +231,27 @@ impl FileUploadService {
 
         Ok(file_model)
     }
+
+    /// 删除 S3 中的文件
+    pub async fn delete_file(s3_config: &S3Config, hash_id: &str) -> ApiResult<()> {
+        let credentials = Self::create_s3_credentials(s3_config);
+        let bucket = Self::create_s3_bucket(s3_config)
+            .map_err(|e| ApiError::Internal(format!("S3 配置错误: {}", e)))?;
+
+        let delete_action = bucket.delete_object(Some(&credentials), hash_id);
+        let url = delete_action.sign(Duration::from_secs(60));
+
+        let client = HttpClient::new();
+        let response = client
+            .delete(url.as_str())
+            .send()
+            .await
+            .map_err(|e| ApiError::Internal(format!("删除文件失败: {}", e)))?;
+
+        if !response.status().is_success() {
+            return Err(ApiError::Internal("删除 S3 文件失败".to_string()));
+        }
+
+        Ok(())
+    }
 }

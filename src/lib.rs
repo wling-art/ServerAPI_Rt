@@ -8,7 +8,7 @@ pub mod schemas;
 pub mod services;
 
 use crate::handlers::servers;
-use axum::{middleware as axum_middleware, routing::get, Router};
+use axum::{middleware as axum_middleware, routing::{get, delete}, Router};
 use tower_http::cors::CorsLayer;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
@@ -24,7 +24,8 @@ use crate::services::database::DatabaseConnection;
         servers::update_server,
         servers::get_server_managers,
         servers::get_server_gallery,
-        servers::upload_gallery_image
+        servers::upload_gallery_image,
+        servers::delete_gallery_image
     ),
     components(
         schemas(
@@ -40,6 +41,7 @@ use crate::services::database::DatabaseConnection;
             schemas::servers::ServerGallery,
             schemas::servers::GalleryImage,
             schemas::servers::GalleryImageRequest,
+            schemas::servers::SuccessResponse,
             entities::server::AuthModeEnum,
             entities::server::ServerTypeEnum,
             crate::errors::ApiErrorResponse,
@@ -65,6 +67,10 @@ pub fn create_app(db: DatabaseConnection) -> Router {
         .route(
             "/v2/servers/{server_id}/gallery",
             get(servers::get_server_gallery).post(servers::upload_gallery_image),
+        )
+        .route(
+            "/v2/servers/{server_id}/gallery/{image_id}",
+            delete(servers::delete_gallery_image),
         )
         .layer(axum_middleware::from_fn_with_state(
             db.clone(),

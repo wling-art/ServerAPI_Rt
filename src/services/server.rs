@@ -921,4 +921,57 @@ impl ServerService {
 
         Ok(())
     }
+
+    /// 删除服务器画册图片
+    pub async fn delete_gallery_image(
+        db: &DatabaseConnection,
+        s3_config: &S3Config,
+        server_id: i32,
+        image_id: i32,
+    ) -> ApiResult<()> {
+        use crate::services::file_upload::FileUploadService;
+
+        // 查找服务器是否存在
+        let server = ServerEntity::find_by_id(server_id)
+            .one(db.as_ref())
+            .await
+            .map_err(|e| crate::errors::ApiError::Database(e.to_string()))?
+            .ok_or_else(|| crate::errors::ApiError::NotFound("服务器不存在".to_string()))?;
+
+        // 检查服务器是否有画册
+        let gallery_id = server
+            .gallery_id
+            .ok_or_else(|| crate::errors::ApiError::NotFound("该服务器没有画册".to_string()))?;
+
+        // 查找要删除的图片
+        let gallery_image = GalleryImageEntity::find_by_id(image_id)
+            .one(db.as_ref())
+            .await
+            .map_err(|e| crate::errors::ApiError::Database(e.to_string()))?
+            .ok_or_else(|| crate::errors::ApiError::NotFound("图片不存在".to_string()))?;
+
+        // 检查图片是否属于该服务器的画册
+        if gallery_image.gallery_id != gallery_id {
+            return Err(crate::errors::ApiError::Forbidden(
+                "图片不属于该服务器".to_string(),
+            ));
+        }
+
+        // 删除S3中的文件
+        FileUploadService::delete_file(s3_config, &gallery_image.image_hash_id).await?;
+
+        // 删除文件记录
+        FileEntity::delete_by_id(&gallery_image.image_hash_id)
+            .exec(db.as_ref())
+            .await
+            .map_err(|e| crate::errors::ApiError::Database(e.to_string()))?;
+
+        // 删除图片记录
+        GalleryImageEntity::delete_by_id(image_id)
+            .exec(db.as_ref())
+            .await
+            .map_err(|e| crate::errors::ApiError::Database(e.to_string()))?;
+
+        Ok(())
+    }
 }

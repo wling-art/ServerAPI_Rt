@@ -2,7 +2,7 @@ use crate::{
     errors::{ApiError, ApiErrorResponse, ApiResult},
     schemas::servers::{
         GalleryImageRequest, GalleryImageSchema, ServerDetail, ServerGallery, ServerListResponse,
-        ServerManagersResponse, UpdateServerRequest,
+        ServerManagersResponse, SuccessResponse, UpdateServerRequest,
     },
     services::{auth::Claims, database::DatabaseConnection, server::ServerService},
 };
@@ -307,6 +307,7 @@ pub async fn get_server_gallery(
         (
             status = 201,
             description = "成功添加服务器画册图片",
+            body = SuccessResponse,
             example = json!({
                 "message": "成功添加服务器画册图片"
             })
@@ -380,5 +381,95 @@ pub async fn upload_gallery_image(
 
     Ok(Json(serde_json::json!({
         "message": "成功添加服务器画册图片"
+    })))
+}
+
+/// 删除服务器画册图片
+#[utoipa::path(
+    delete,
+    path = "/v2/servers/{server_id}/gallery/{image_id}",
+    summary = "删除服务器画册图片",
+    description = "删除指定服务器的画册图片，需要服务器管理员权限",
+    responses(
+        (
+            status = 200,
+            description = "成功删除服务器画册图片",
+            body = SuccessResponse,
+            example = json!({
+                "message": "成功删除服务器画册图片"
+            })
+        ),
+        (
+            status = 401,
+            description = "无权限操作",
+            body = ApiErrorResponse,
+            example = json!({
+                "error": "未授权",
+                "status": 401
+            })
+        ),
+        (
+            status = 403,
+            description = "权限不足",
+            body = ApiErrorResponse,
+            example = json!({
+                "error": "权限不足，只有服务器管理员可以删除画册图片",
+                "status": 403
+            })
+        ),
+        (
+            status = 404,
+            description = "未找到服务器或图片",
+            body = ApiErrorResponse,
+            examples(
+                ("服务器不存在" = (value = json!({"error": "服务器不存在", "status": 404}))),
+                ("图片不存在" = (value = json!({"error": "图片不存在", "status": 404}))),
+                ("该服务器没有画册" = (value = json!({"error": "该服务器没有画册", "status": 404})))
+            )
+        ),
+        (
+            status = 403,
+            description = "图片不属于该服务器",
+            body = ApiErrorResponse,
+            example = json!({
+                "error": "图片不属于该服务器",
+                "status": 403
+            })
+        )
+    ),
+    tag = "servers",
+    params(
+        ("server_id" = i32, Path, description = "服务器ID"),
+        ("image_id" = i32, Path, description = "图片ID")
+    )
+)]
+pub async fn delete_gallery_image(
+    State(db): State<DatabaseConnection>,
+    Path((server_id, image_id)): Path<(i32, i32)>,
+    user_claims: Option<Extension<Claims>>,
+) -> ApiResult<Json<serde_json::Value>> {
+    // 检查用户是否登录
+    let claims = user_claims
+        .ok_or_else(|| ApiError::Unauthorized("未授权".to_string()))?
+        .0;
+
+    // 检查用户是否有这个服务器的编辑权
+    let has_permission =
+        ServerService::has_server_edit_permission(&db, claims.id, server_id).await?;
+    if !has_permission {
+        return Err(ApiError::Forbidden(
+            "权限不足，只有服务器管理员可以删除画册图片".to_string(),
+        ));
+    }
+
+    // 从环境变量获取S3配置
+    let config = crate::config::Config::from_env()
+        .map_err(|e| ApiError::Internal(format!("配置加载失败: {}", e)))?;
+
+    // 删除画册图片
+    ServerService::delete_gallery_image(&db, &config.s3, server_id, image_id).await?;
+
+    Ok(Json(serde_json::json!({
+        "message": "成功删除服务器画册图片"
     })))
 }

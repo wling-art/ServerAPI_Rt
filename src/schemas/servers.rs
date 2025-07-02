@@ -308,3 +308,11 @@ pub struct GalleryImageSchema {
     #[schema(value_type = String, format = Binary)]
     pub image: FieldData<axum::body::Bytes>,
 }
+
+/// 通用成功响应
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct SuccessResponse {
+    /// 成功消息
+    #[schema(example = "操作成功")]
+    pub message: String,
+}
