@@ -24,7 +24,7 @@ use crate::services::database::DatabaseConnection;
         servers::update_server,
         servers::get_server_managers,
         servers::get_server_gallery,
-        servers::add_server_gallery_image
+        servers::upload_gallery_image
     ),
     components(
         schemas(
@@ -64,7 +64,7 @@ pub fn create_app(db: DatabaseConnection) -> Router {
         )
         .route(
             "/v2/servers/{server_id}/gallery",
-            get(servers::get_server_gallery).post(servers::add_server_gallery_image),
+            get(servers::get_server_gallery).post(servers::upload_gallery_image),
         )
         .layer(axum_middleware::from_fn_with_state(
             db.clone(),

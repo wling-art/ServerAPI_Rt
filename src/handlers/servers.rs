@@ -1,8 +1,8 @@
 use crate::{
     errors::{ApiError, ApiErrorResponse, ApiResult},
     schemas::servers::{
-        GalleryImageRequest, GalleryImageSchema, ServerDetail, ServerGallery, ServerListResponse, ServerManagersResponse,
-        UpdateServerRequest,
+        GalleryImageRequest, GalleryImageSchema, ServerDetail, ServerGallery, ServerListResponse,
+        ServerManagersResponse, UpdateServerRequest,
     },
     services::{auth::Claims, database::DatabaseConnection, server::ServerService},
 };
@@ -351,7 +351,7 @@ pub async fn get_server_gallery(
     tag = "servers",
     params(("server_id" = i32, Path, description = "服务器ID"))
 )]
-pub async fn add_server_gallery_image(
+pub async fn upload_gallery_image(
     State(db): State<DatabaseConnection>,
     Path(server_id): Path<i32>,
     user_claims: Option<Extension<Claims>>,
@@ -363,7 +363,8 @@ pub async fn add_server_gallery_image(
         .0;
 
     // 检查用户是否有这个服务器的编辑权
-    let has_permission = ServerService::has_server_edit_permission(&db, claims.id, server_id).await?;
+    let has_permission =
+        ServerService::has_server_edit_permission(&db, claims.id, server_id).await?;
     if !has_permission {
         return Err(ApiError::Forbidden(
             "权限不足，只有服务器管理员可以添加画册图片".to_string(),
