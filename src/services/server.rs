@@ -8,13 +8,14 @@ use crate::entities::{server, ServerEntity, UserEntity};
 use crate::services::FileUploadService;
 use crate::{
     entities::{
-        file, server_status, user_server, FileEntity, ServerStatusEntity, UserServerEntity,
+        file, gallery_image, server_status, user_server, FileEntity, GalleryImageEntity,
+        ServerStatusEntity, UserServerEntity,
     },
     errors::ApiResult,
     handlers::servers::ListQuery,
     schemas::servers::{
-        ApiAuthMode, ApiServerType, ManagerInfo, Motd, ServerDetail, ServerManagerRole,
-        ServerManagersResponse, ServerStatus, UpdateServerRequest,
+        ApiAuthMode, ApiServerType, GalleryImage, ManagerInfo, Motd, ServerDetail, ServerGallery,
+        ServerManagerRole, ServerManagersResponse, ServerStatus, UpdateServerRequest,
     },
     services::database::DatabaseConnection,
 };
@@ -238,13 +239,7 @@ impl ServerService {
         };
 
         let cover_url = if let (Some(_hash), Some(file_model)) = (&server.cover_hash, cover_file) {
-            if file_model.file_path.starts_with("http://")
-                || file_model.file_path.starts_with("https://")
-            {
-                Some(file_model.file_path)
-            } else {
-                Some(format!("/static/{}", file_model.file_path))
-            }
+            Some(file_model.file_path)
         } else {
             None
         };
@@ -424,6 +419,15 @@ impl ServerService {
             .map(|file_path| file_path.clone())
     }
 
+    /// 构建图片URL
+    fn build_image_url(file_path: &str) -> String {
+        if file_path.starts_with("http://") || file_path.starts_with("https://") {
+            file_path.to_string()
+        } else {
+            format!("/static/{}", file_path)
+        }
+    }
+
     /// 解析服务器状态JSON为ServerStatus结构
     fn parse_server_status(stat_data: &Value) -> ApiResult<ServerStatus> {
         let players = stat_data
@@ -597,6 +601,146 @@ impl ServerService {
                 "无权限编辑该服务器".to_string(),
             )),
         }
+    }
+
+    /// 获取服务器相册
+    pub async fn get_server_gallery(
+        db: &DatabaseConnection,
+        server_id: i32,
+    ) -> ApiResult<ServerGallery> {
+        // 验证server_id参数
+        if server_id <= 0 {
+            return Err(crate::errors::ApiError::BadRequest(
+                "服务器ID必须大于0".to_string(),
+            ));
+        }
+
+        // 查找服务器是否存在
+        let server = ServerEntity::find_by_id(server_id)
+            .one(db.as_ref())
+            .await
+            .map_err(|e| {
+                tracing::error!("查询服务器失败: server_id={}, error={}", server_id, e);
+                crate::errors::ApiError::Database(format!("查询服务器失败: {}", e))
+            })?
+            .ok_or_else(|| {
+                tracing::warn!("服务器不存在: server_id={}", server_id);
+                crate::errors::ApiError::NotFound("服务器不存在".to_string())
+            })?;
+
+        // 获取服务器关联的相册图片列表
+        let gallery_images = Self::get_server_gallery_images(db, &server).await?;
+
+        tracing::info!(
+            "成功获取服务器相册: server_id={}, gallery_count={}",
+            server_id,
+            gallery_images.len()
+        );
+
+        Ok(ServerGallery {
+            id: server.id,
+            name: server.name,
+            gallery_images: gallery_images,
+        })
+    }
+
+    /// 获取服务器相册图片列表
+    async fn get_server_gallery_images(
+        db: &DatabaseConnection,
+        server: &server::Model,
+    ) -> ApiResult<Vec<GalleryImage>> {
+        // 如果服务器没有关联相册，返回空列表
+        let gallery_id = match server.gallery_id {
+            Some(id) => {
+                tracing::debug!(
+                    "服务器关联相册ID: server_id={}, gallery_id={}",
+                    server.id,
+                    id
+                );
+                id
+            }
+            None => {
+                tracing::debug!("服务器未关联相册: server_id={}", server.id);
+                return Ok(vec![]);
+            }
+        };
+
+        // 查询相册下的所有图片
+        let gallery_images = GalleryImageEntity::find()
+            .filter(gallery_image::Column::GalleryId.eq(gallery_id))
+            .all(db.as_ref())
+            .await
+            .map_err(|e| {
+                tracing::error!("查询相册图片失败: gallery_id={}, error={}", gallery_id, e);
+                crate::errors::ApiError::Database(format!("查询相册图片失败: {}", e))
+            })?;
+
+        if gallery_images.is_empty() {
+            tracing::debug!("相册无图片: gallery_id={}", gallery_id);
+            return Ok(vec![]);
+        }
+
+        tracing::debug!(
+            "找到相册图片数量: gallery_id={}, count={}",
+            gallery_id,
+            gallery_images.len()
+        );
+
+        // 收集所有图片hash用于批量查询文件信息
+        let image_hashes: Vec<String> = gallery_images
+            .iter()
+            .map(|img| img.image_hash_id.clone())
+            .collect();
+
+        // 批量查询文件信息
+        let image_files = FileEntity::find()
+            .filter(file::Column::HashValue.is_in(image_hashes.clone()))
+            .all(db.as_ref())
+            .await
+            .map_err(|e| {
+                tracing::error!("查询图片文件失败: hashes={:?}, error={}", image_hashes, e);
+                crate::errors::ApiError::Database(format!("查询图片文件失败: {}", e))
+            })?;
+
+        // 构建文件映射表
+        let file_map: HashMap<String, String> = image_files
+            .iter()
+            .map(|file_model| (file_model.hash_value.clone(), file_model.file_path.clone()))
+            .collect();
+
+        // 构建返回数据
+        let mut gallery_list = Vec::new();
+        let mut missing_files = Vec::new();
+
+        for gallery_image in gallery_images {
+            if let Some(file_path) = file_map.get(&gallery_image.image_hash_id) {
+                let image_url = Self::build_image_url(file_path);
+                gallery_list.push(GalleryImage {
+                    id: gallery_image.id,
+                    title: gallery_image.title,
+                    description: gallery_image.description,
+                    image_url,
+                });
+            } else {
+                missing_files.push(gallery_image.image_hash_id.clone());
+            }
+        }
+
+        if !missing_files.is_empty() {
+            tracing::warn!(
+                "部分图片文件缺失: gallery_id={}, missing_files={:?}",
+                gallery_id,
+                missing_files
+            );
+        }
+
+        tracing::debug!(
+            "成功构建相册列表: gallery_id={}, valid_images={}",
+            gallery_id,
+            gallery_list.len()
+        );
+
+        Ok(gallery_list)
     }
 
     /// 获取服务器管理员列表

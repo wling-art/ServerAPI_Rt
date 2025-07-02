@@ -1,6 +1,7 @@
 pub mod ban_record;
 pub mod file;
 pub mod gallery;
+pub mod gallery_image;
 pub mod server;
 pub mod server_status;
 pub mod ticket;
@@ -35,6 +36,12 @@ pub use ticket::{
 pub use gallery::{
     ActiveModel as GalleryActiveModel, Column as GalleryColumn, Entity as GalleryEntity,
     Model as GalleryModel, Relation as GalleryRelation,
+};
+
+// GalleryImage entities
+pub use gallery_image::{
+    ActiveModel as GalleryImageActiveModel, Column as GalleryImageColumn, Entity as GalleryImageEntity,
+    Model as GalleryImageModel, Relation as GalleryImageRelation,
 };
 
 // BanRecord entities

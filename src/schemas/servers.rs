@@ -241,3 +241,38 @@ pub struct ServerManagersResponse {
     /// 管理员列表
     pub admins: Vec<ManagerInfo>,
 }
+
+/// 单个相册图片信息
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct GalleryImage {
+    /// 图片ID
+    #[schema(example = 10)]
+    pub id: i32,
+
+    /// 图片标题
+    #[schema(example = "建筑全景")]
+    pub title: String,
+
+    /// 图片描述
+    #[schema(example = "主城鸟瞰图")]
+    pub description: String,
+
+    /// 图片URL地址
+    #[schema(example = "https://cdn.example.com/gallery1.png")]
+    pub image_url: String,
+}
+
+/// 服务器相册响应
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct ServerGallery {
+    /// 服务器ID
+    #[schema(example = 2)]
+    pub id: i32,
+
+    /// 服务器名称
+    #[schema(example = "服务器名称")]
+    pub name: String,
+
+    /// 相册图片列表
+    pub gallery_images: Vec<GalleryImage>,
+}

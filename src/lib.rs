@@ -22,7 +22,13 @@ use crate::services::database::DatabaseConnection;
 
 #[derive(OpenApi)]
 #[openapi(
-    paths(servers::list_servers, servers::get_server_detail, servers::update_server, servers::get_server_managers),
+    paths(
+        servers::list_servers,
+        servers::get_server_detail,
+        servers::update_server,
+        servers::get_server_managers,
+        servers::get_server_gallery
+    ),
     components(
         schemas(
             schemas::servers::ServerListResponse,
@@ -34,6 +40,8 @@ use crate::services::database::DatabaseConnection;
             schemas::servers::UpdateServerRequest,
             schemas::servers::ServerManagersResponse,
             schemas::servers::ManagerInfo,
+            schemas::servers::ServerGallery,
+            schemas::servers::GalleryImage,
             entities::server::AuthModeEnum,
             entities::server::ServerTypeEnum,
             crate::errors::ApiErrorResponse,
@@ -53,6 +61,10 @@ pub fn create_app(db: DatabaseConnection) -> Router {
         .route(
             "/v2/servers/{server_id}/managers",
             get(servers::get_server_managers),
+        )
+        .route(
+            "/v2/servers/{server_id}/gallery",
+            get(servers::get_server_gallery),
         )
         .layer(axum_middleware::from_fn_with_state(
             db.clone(),

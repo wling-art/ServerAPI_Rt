@@ -1,7 +1,8 @@
 use crate::{
     errors::{ApiError, ApiErrorResponse, ApiResult},
     schemas::servers::{
-        ServerDetail, ServerListResponse, ServerManagersResponse, UpdateServerRequest,
+        ServerDetail, ServerGallery, ServerListResponse, ServerManagersResponse,
+        UpdateServerRequest,
     },
     services::{auth::Claims, database::DatabaseConnection, server::ServerService},
 };
@@ -256,5 +257,38 @@ pub async fn get_server_managers(
     Path(server_id): Path<i32>,
 ) -> ApiResult<Json<ServerManagersResponse>> {
     let result = ServerService::get_server_managers(&db, server_id).await?;
+    Ok(Json(result))
+}
+
+/// 获取服务器相册
+#[utoipa::path(
+    get,
+    path = "/v2/servers/{server_id}/gallery",
+    summary = "获取服务器相册",
+    description = "获取指定服务器的所有相册图片信息",
+    responses(
+        (
+            status = 200,
+            description = "成功获取服务器相册",
+            body = ServerGallery,
+        ),
+        (
+            status = 404,
+            description = "服务器不存在",
+            body = ApiErrorResponse,
+            example = json!({
+                "error": "服务器不存在",
+                "status": 404
+            })
+        )
+    ),
+    tag = "servers",
+    params(("server_id" = i32, Path, description = "服务器ID"))
+)]
+pub async fn get_server_gallery(
+    State(db): State<DatabaseConnection>,
+    Path(server_id): Path<i32>,
+) -> ApiResult<Json<ServerGallery>> {
+    let result = ServerService::get_server_gallery(&db, server_id).await?;
     Ok(Json(result))
 }
