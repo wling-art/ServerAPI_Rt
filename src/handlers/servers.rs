@@ -52,6 +52,14 @@ pub struct ListQuery {
     pub seed: Option<i64>,
 }
 
+#[derive(Deserialize, utoipa::IntoParams, utoipa::ToSchema)]
+pub struct ServerDetailQuery {
+    /// 是否返回完整信息(需要登录)
+    #[schema(example = false, default = false)]
+    #[serde(default)]
+    pub full_info: Option<bool>,
+}
+
 /// 获取服务器列表
 #[utoipa::path(
     get,
@@ -81,10 +89,6 @@ pub async fn list_servers(
     user_claims: Option<Extension<Claims>>,
 ) -> ApiResult<Json<ServerListResponse>> {
     if query.page < 1 || query.page_size < 1 {
-        println!(
-            "Invalid page or page_size: page={}, page_size={}",
-            query.page, query.page_size
-        );
         return Err(ApiError::BadRequest(
             "page 与 page_size 不能小于 1".to_string(),
         ));
@@ -103,6 +107,7 @@ pub async fn list_servers(
         total_pages,
     }))
 }
+
 /// 获取特定服务器的详细信息
 #[utoipa::path(
     get,
@@ -131,22 +136,23 @@ pub async fn list_servers(
     ),
     tag = "servers",
     params(("server_id" = i32, Path, description = "服务器 ID"),
-            ("full_info" = Option<bool>, Query, description = "是否返回完整信息(需要登录)"))
+           ServerDetailQuery)
 )]
 pub async fn get_server_detail(
     State(db): State<DatabaseConnection>,
     Path(server_id): Path<i32>,
-    Query(full_info): Query<Option<bool>>,
+    Query(query): Query<ServerDetailQuery>,
     user_claims: Option<Extension<Claims>>,
 ) -> ApiResult<Json<ServerDetail>> {
     let user_id = user_claims.map(|Extension(claims)| claims.id);
 
-    let full_info = full_info.unwrap_or(false);
+    let full_info = query.full_info.unwrap_or(false);
 
     let result = ServerService::get_server_detail(&db, user_id, server_id, full_info).await?;
 
     Ok(Json(result))
 }
+
 /// 更新对应服务器具体信息
 #[utoipa::path(
     put,
