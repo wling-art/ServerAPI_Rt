@@ -192,4 +192,43 @@ impl FileUploadService {
 
         Ok(file_model)
     }
+
+    /// 验证并上传画册图片文件
+    pub async fn validate_and_upload_gallery(
+        db: &DatabaseConnection,
+        s3_config: &S3Config,
+        content: Vec<u8>,
+        _filename: &str,
+    ) -> ApiResult<file::Model> {
+        // 检查文件大小（5MB 限制）
+        if content.len() > 5 * 1024 * 1024 {
+            return Err(ApiError::BadRequest(
+                "图片文件大小不能超过 5 MB".to_string(),
+            ));
+        }
+
+        // 尝试打开图片
+        let _img = image::load_from_memory(&content)
+            .map_err(|_| ApiError::BadRequest("图片文件无效".to_string()))?;
+
+        // 检查图片格式
+        let format = image::guess_format(&content)
+            .map_err(|_| ApiError::BadRequest("无法识别图片格式".to_string()))?;
+
+        match format {
+            ImageFormat::Jpeg | ImageFormat::Png | ImageFormat::WebP => {}
+            _ => {
+                return Err(ApiError::BadRequest("图片文件格式无效".to_string()));
+            }
+        }
+
+        // 转换为 WebP
+        let webp_content = Self::convert_to_webp(&content)?;
+
+        // 上传到 S3
+        let (_url, file_model) =
+            Self::upload_file_to_s3(db, s3_config, webp_content, "gallery.webp").await?;
+
+        Ok(file_model)
+    }
 }

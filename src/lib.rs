@@ -8,11 +8,7 @@ pub mod schemas;
 pub mod services;
 
 use crate::handlers::servers;
-use axum::{
-    middleware as axum_middleware,
-    routing::{get, put},
-    Router,
-};
+use axum::{middleware as axum_middleware, routing::get, Router};
 use tower_http::cors::CorsLayer;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
@@ -27,7 +23,8 @@ use crate::services::database::DatabaseConnection;
         servers::get_server_detail,
         servers::update_server,
         servers::get_server_managers,
-        servers::get_server_gallery
+        servers::get_server_gallery,
+        servers::add_server_gallery_image
     ),
     components(
         schemas(
@@ -42,6 +39,7 @@ use crate::services::database::DatabaseConnection;
             schemas::servers::ManagerInfo,
             schemas::servers::ServerGallery,
             schemas::servers::GalleryImage,
+            schemas::servers::GalleryImageRequest,
             entities::server::AuthModeEnum,
             entities::server::ServerTypeEnum,
             crate::errors::ApiErrorResponse,
@@ -56,15 +54,17 @@ pub fn create_app(db: DatabaseConnection) -> Router {
     Router::new()
         // Server routes with optional authentication
         .route("/v2/servers", get(servers::list_servers))
-        .route("/v2/servers/{server_id}", get(servers::get_server_detail))
-        .route("/v2/servers/{server_id}", put(servers::update_server))
+        .route(
+            "/v2/servers/{server_id}",
+            get(servers::get_server_detail).put(servers::update_server),
+        )
         .route(
             "/v2/servers/{server_id}/managers",
             get(servers::get_server_managers),
         )
         .route(
             "/v2/servers/{server_id}/gallery",
-            get(servers::get_server_gallery),
+            get(servers::get_server_gallery).post(servers::add_server_gallery_image),
         )
         .layer(axum_middleware::from_fn_with_state(
             db.clone(),

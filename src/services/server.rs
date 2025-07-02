@@ -5,19 +5,20 @@ use serde_json::Value;
 use validator::Validate;
 
 use crate::entities::{server, ServerEntity, UserEntity};
-use crate::services::FileUploadService;
 use crate::{
+    config::S3Config,
     entities::{
-        file, gallery_image, server_status, user_server, FileEntity, GalleryImageEntity,
-        ServerStatusEntity, UserServerEntity,
+        file, gallery, gallery_image, server_status, user_server, FileEntity, GalleryEntity,
+        GalleryImageEntity, ServerStatusEntity, UserServerEntity,
     },
     errors::ApiResult,
     handlers::servers::ListQuery,
     schemas::servers::{
-        ApiAuthMode, ApiServerType, GalleryImage, ManagerInfo, Motd, ServerDetail, ServerGallery,
-        ServerManagerRole, ServerManagersResponse, ServerStatus, UpdateServerRequest,
+        ApiAuthMode, ApiServerType, GalleryImage, GalleryImageSchema, ManagerInfo, Motd,
+        ServerDetail, ServerGallery, ServerManagerRole, ServerManagersResponse, ServerStatus,
+        UpdateServerRequest,
     },
-    services::database::DatabaseConnection,
+    services::{database::DatabaseConnection, file_upload::FileUploadService},
 };
 use sea_orm::{ActiveModelTrait, Set};
 /// 分页结果结构体
@@ -829,5 +830,95 @@ impl ServerService {
         }
 
         Ok(ServerManagersResponse { owners, admins })
+    }
+
+    /// 检查用户是否有服务器的编辑权限（返回bool值）
+    pub async fn has_server_edit_permission(
+        db: &DatabaseConnection,
+        user_id: i32,
+        server_id: i32,
+    ) -> ApiResult<bool> {
+        let user_server = UserServerEntity::find()
+            .filter(user_server::Column::UserId.eq(user_id))
+            .filter(user_server::Column::ServerId.eq(server_id))
+            .filter(user_server::Column::Role.is_in(["owner", "admin"]))
+            .one(db.as_ref())
+            .await
+            .map_err(|e| crate::errors::ApiError::Database(e.to_string()))?;
+
+        Ok(user_server.is_some())
+    }
+
+    /// 添加服务器画册图片
+    pub async fn add_gallery_image(
+        db: &DatabaseConnection,
+        s3_config: &S3Config,
+        server_id: i32,
+        gallery_data: &GalleryImageSchema,
+    ) -> ApiResult<()> {
+        // 查找是否有这个服务器
+        let server = ServerEntity::find_by_id(server_id)
+            .one(db.as_ref())
+            .await
+            .map_err(|e| crate::errors::ApiError::Database(e.to_string()))?
+            .ok_or_else(|| crate::errors::ApiError::NotFound("服务器不存在".to_string()))?;
+
+        // 验证标题和描述
+        gallery_data
+            .validate()
+            .map_err(|e| crate::errors::ApiError::BadRequest(format!("参数验证失败: {}", e)))?;
+
+        // 创建图库（如果不存在）
+        let gallery_id = if let Some(gallery_id) = server.gallery_id {
+            gallery_id
+        } else {
+            let new_gallery = gallery::ActiveModel {
+                created_at: Set(chrono::Utc::now().into()),
+                ..Default::default()
+            };
+            let gallery = GalleryEntity::insert(new_gallery)
+                .exec_with_returning(db.as_ref())
+                .await
+                .map_err(|e| crate::errors::ApiError::Database(e.to_string()))?;
+
+            // 更新服务器的gallery_id
+            let mut server_active: server::ActiveModel = server.into();
+            server_active.gallery_id = Set(Some(gallery.id));
+            ServerEntity::update(server_active)
+                .exec(db.as_ref())
+                .await
+                .map_err(|e| crate::errors::ApiError::Database(e.to_string()))?;
+
+            gallery.id
+        };
+
+        // 验证并上传图片
+        let image_content = gallery_data.image.contents.to_vec();
+        let filename = gallery_data
+            .image
+            .metadata
+            .file_name
+            .as_deref()
+            .unwrap_or("image.jpg");
+
+        let image_file =
+            FileUploadService::validate_and_upload_gallery(db, s3_config, image_content, filename)
+                .await?;
+
+        // 创建图片记录
+        let gallery_image = gallery_image::ActiveModel {
+            gallery_id: Set(gallery_id),
+            title: Set(gallery_data.title.clone()),
+            description: Set(gallery_data.description.clone()),
+            image_hash_id: Set(image_file.hash_value),
+            ..Default::default()
+        };
+
+        GalleryImageEntity::insert(gallery_image)
+            .exec(db.as_ref())
+            .await
+            .map_err(|e| crate::errors::ApiError::Database(e.to_string()))?;
+
+        Ok(())
     }
 }

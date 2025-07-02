@@ -274,3 +274,37 @@ pub struct ServerGallery {
     /// 相册图片列表
     pub gallery_images: Vec<GalleryImage>,
 }
+
+/// 添加画册图片的请求结构体（用于OpenAPI文档）
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct GalleryImageRequest {
+    /// 图片标题
+    #[schema(example = "主城建筑")]
+    pub title: String,
+
+    /// 图片描述
+    #[schema(example = "这是一个非常棒的主城建筑，展示了我们服务器的建筑水平")]
+    pub description: String,
+
+    /// 图片文件
+    #[schema(value_type = String, format = Binary)]
+    pub image: String,
+}
+
+/// 添加画册图片的请求结构体
+#[derive(Debug, TryFromMultipart, Validate, ToSchema)]
+pub struct GalleryImageSchema {
+    /// 图片标题
+    #[schema(example = "主城建筑")]
+    #[validate(length(min = 1, max = 100, message = "标题长度必须在1-100个字符之间"))]
+    pub title: String,
+
+    /// 图片描述
+    #[schema(example = "这是一个非常棒的主城建筑，展示了我们服务器的建筑水平")]
+    #[validate(length(min = 1, max = 500, message = "描述长度必须在1-500个字符之间"))]
+    pub description: String,
+
+    /// 图片文件
+    #[schema(value_type = String, format = Binary)]
+    pub image: FieldData<axum::body::Bytes>,
+}

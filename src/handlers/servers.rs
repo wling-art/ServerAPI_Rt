@@ -1,7 +1,7 @@
 use crate::{
     errors::{ApiError, ApiErrorResponse, ApiResult},
     schemas::servers::{
-        ServerDetail, ServerGallery, ServerListResponse, ServerManagersResponse,
+        GalleryImageRequest, GalleryImageSchema, ServerDetail, ServerGallery, ServerListResponse, ServerManagersResponse,
         UpdateServerRequest,
     },
     services::{auth::Claims, database::DatabaseConnection, server::ServerService},
@@ -291,4 +291,93 @@ pub async fn get_server_gallery(
 ) -> ApiResult<Json<ServerGallery>> {
     let result = ServerService::get_server_gallery(&db, server_id).await?;
     Ok(Json(result))
+}
+
+/// 添加服务器画册图片
+#[utoipa::path(
+    post,
+    path = "/v2/servers/{server_id}/gallery",
+    summary = "添加服务器画册图片",
+    description = "为指定服务器添加画册图片，需要服务器管理员权限",
+    request_body(
+        content = GalleryImageRequest,
+        content_type = "multipart/form-data"
+    ),
+    responses(
+        (
+            status = 201,
+            description = "成功添加服务器画册图片",
+            example = json!({
+                "message": "成功添加服务器画册图片"
+            })
+        ),
+        (
+            status = 401,
+            description = "无权限操作",
+            body = ApiErrorResponse,
+            example = json!({
+                "error": "未授权",
+                "status": 401
+            })
+        ),
+        (
+            status = 403,
+            description = "权限不足",
+            body = ApiErrorResponse,
+            example = json!({
+                "error": "权限不足，只有服务器管理员可以添加画册图片",
+                "status": 403
+            })
+        ),
+        (
+            status = 404,
+            description = "未找到服务器",
+            body = ApiErrorResponse,
+            example = json!({
+                "error": "服务器不存在",
+                "status": 404
+            })
+        ),
+        (
+            status = 400,
+            description = "请求参数错误",
+            body = ApiErrorResponse,
+            example = json!({
+                "error": "图片文件格式无效",
+                "status": 400
+            })
+        )
+    ),
+    tag = "servers",
+    params(("server_id" = i32, Path, description = "服务器ID"))
+)]
+pub async fn add_server_gallery_image(
+    State(db): State<DatabaseConnection>,
+    Path(server_id): Path<i32>,
+    user_claims: Option<Extension<Claims>>,
+    TypedMultipart(gallery_data): TypedMultipart<GalleryImageSchema>,
+) -> ApiResult<Json<serde_json::Value>> {
+    // 检查用户是否登录
+    let claims = user_claims
+        .ok_or_else(|| ApiError::Unauthorized("未授权".to_string()))?
+        .0;
+
+    // 检查用户是否有这个服务器的编辑权
+    let has_permission = ServerService::has_server_edit_permission(&db, claims.id, server_id).await?;
+    if !has_permission {
+        return Err(ApiError::Forbidden(
+            "权限不足，只有服务器管理员可以添加画册图片".to_string(),
+        ));
+    }
+
+    // 从环境变量获取S3配置
+    let config = crate::config::Config::from_env()
+        .map_err(|e| ApiError::Internal(format!("配置加载失败: {}", e)))?;
+
+    // 添加画册图片
+    ServerService::add_gallery_image(&db, &config.s3, server_id, &gallery_data).await?;
+
+    Ok(Json(serde_json::json!({
+        "message": "成功添加服务器画册图片"
+    })))
 }
