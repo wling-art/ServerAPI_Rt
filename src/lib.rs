@@ -8,17 +8,21 @@ pub mod schemas;
 pub mod services;
 
 use crate::handlers::servers;
-use axum::{ middleware as axum_middleware, routing::get, Router };
+use axum::{
+    middleware as axum_middleware,
+    routing::{get, put},
+    Router,
+};
 use tower_http::cors::CorsLayer;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
-use crate::middleware::{ simple_http_logging_middleware, auth::optional_auth_middleware };
+use crate::middleware::{auth::optional_auth_middleware, simple_http_logging_middleware};
 use crate::services::database::DatabaseConnection;
 
 #[derive(OpenApi)]
 #[openapi(
-    paths(servers::list_servers, servers::get_server_detail),
+    paths(servers::list_servers, servers::get_server_detail, servers::update_server),
     components(
         schemas(
             schemas::servers::ServerListResponse,
@@ -27,6 +31,7 @@ use crate::services::database::DatabaseConnection;
             schemas::servers::ServerStatus,
             schemas::servers::ApiAuthMode,
             schemas::servers::Motd,
+            schemas::servers::UpdateServerRequest,
             entities::server::AuthModeEnum,
             entities::server::ServerTypeEnum,
             crate::errors::ApiErrorResponse,
@@ -41,13 +46,14 @@ pub fn create_app(db: DatabaseConnection) -> Router {
     Router::new()
         // Server routes with optional authentication
         .route("/v2/servers", get(servers::list_servers))
-        .route("/v2/servers/:id", get(servers::get_server_detail))
-        .layer(axum_middleware::from_fn_with_state(db.clone(), optional_auth_middleware))
+        .route("/v2/servers/{server_id}", get(servers::get_server_detail))
+        .route("/v2/servers/{server_id}", put(servers::update_server))
+        .layer(axum_middleware::from_fn_with_state(
+            db.clone(),
+            optional_auth_middleware,
+        ))
         // Health check
-        .route(
-            "/health",
-            get(|| async { "OK" })
-        )
+        .route("/health", get(|| async { "OK" }))
         // Swagger UI
         .merge(SwaggerUi::new("/docs").url("/openapi.json", ApiDoc::openapi()))
         .with_state(db)

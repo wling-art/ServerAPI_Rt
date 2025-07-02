@@ -1,10 +1,10 @@
 use axum::{
-    extract::{ ConnectInfo, Request },
+    extract::{ConnectInfo, Request},
+    http::HeaderMap,
     middleware::Next,
     response::Response,
-    http::HeaderMap,
 };
-use std::{ net::SocketAddr, time::Instant };
+use std::{net::SocketAddr, time::Instant};
 
 use crate::logging::HttpLogFormatter;
 
@@ -41,7 +41,7 @@ fn get_real_ip(addr: Option<SocketAddr>, headers: &HeaderMap) -> Option<String> 
 pub async fn http_logging_middleware(
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
     request: Request,
-    next: Next
+    next: Next,
 ) -> Response {
     let start = Instant::now();
     let method = request.method().to_string();
@@ -58,13 +58,8 @@ pub async fn http_logging_middleware(
     let status = response.status().as_u16();
 
     // 记录 HTTP 请求日志
-    let log_message = HttpLogFormatter::format_request(
-        &method,
-        &uri,
-        status,
-        duration,
-        real_ip.as_deref()
-    );
+    let log_message =
+        HttpLogFormatter::format_request(&method, &uri, status, duration, real_ip.as_deref());
 
     tracing::info!("{}", log_message);
 
@@ -88,13 +83,8 @@ pub async fn simple_http_logging_middleware(request: Request, next: Next) -> Res
     let status = response.status().as_u16();
 
     // 记录 HTTP 请求日志
-    let log_message = HttpLogFormatter::format_request(
-        &method,
-        &uri,
-        status,
-        duration,
-        real_ip.as_deref()
-    );
+    let log_message =
+        HttpLogFormatter::format_request(&method, &uri, status, duration, real_ip.as_deref());
 
     tracing::info!("{}", log_message);
 

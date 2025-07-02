@@ -1,8 +1,10 @@
 use sea_orm::entity::prelude::*;
-use serde::{ Deserialize, Serialize };
+use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-#[derive(Debug, Clone, PartialEq, Eq, EnumIter, DeriveActiveEnum, Serialize, Deserialize, ToSchema)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, EnumIter, DeriveActiveEnum, Serialize, Deserialize, ToSchema,
+)]
 #[sea_orm(rs_type = "String", db_type = "Enum", enum_name = "ban_type_enum")]
 pub enum BanTypeEnum {
     #[sea_orm(string_value = "mute")]
@@ -22,7 +24,9 @@ pub struct Model {
     pub ban_type: BanTypeEnum,
     #[sea_orm(column_type = "Text")]
     pub reason: Option<String>,
+    #[schema(value_type = String, format = DateTime)]
     pub started_at: ChronoDateTimeUtc,
+    #[schema(value_type = Option<String>, format = DateTime)]
     pub ended_at: Option<ChronoDateTimeUtc>,
 }
 

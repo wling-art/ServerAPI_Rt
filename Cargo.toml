@@ -5,16 +5,16 @@ edition = "2021"
 
 [dependencies]
 # Web framework
-axum = { version = "0.7", features = ["tokio", "http2", "macros"] }
-axum-extra = { version = "0.9", features = ["typed-header"] }
+axum = { version = "0.8.4", features = ["tokio", "http2", "macros"] }
+axum-extra = { version = "0.10.1", features = ["typed-header"] }
 tower = "0.5"
-tower-http = { version = "0.5", features = ["cors", "trace"] }
+tower-http = { version = "0.6.6", features = ["cors", "trace"] }
 
 # Async runtime
-tokio = { version = "1.0", features = ["full"] }
+tokio = { version = "1.46.0", features = ["full"] }
 
 # Database ORM
-sea-orm = { version = "1.0", features = [
+sea-orm = { version = "1.1.13", features = [
     "sqlx-mysql",
     "runtime-tokio-rustls",
     "macros",
@@ -24,35 +24,35 @@ sea-orm = { version = "1.0", features = [
 ] }
 
 # OpenAPI documentation
-utoipa = { version = "4.2", features = ["axum_extras", "chrono", "uuid"] }
-utoipa-swagger-ui = { version = "7.1", features = ["axum"] }
+utoipa = { version = "5.4.0", features = ["axum_extras", "chrono", "uuid"] }
+utoipa-swagger-ui = { version = "9.0.2", features = ["axum"] }
 
 # Validation
-validator = { version = "0.18", features = ["derive"] }
+validator = { version = "0.20.0", features = ["derive"] }
 
 # Serialization
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
+serde = { version = "1.0.219", features = ["derive"] }
+serde_json = "1.0.140"
 
 # Date and time
-chrono = { version = "0.4", features = ["serde", "clock"] }
+chrono = { version = "0.4.41", features = ["serde", "clock"] }
 
 # UUID
-uuid = { version = "1.0", features = ["v4", "serde"] }
+uuid = { version = "1.17.0", features = ["v4", "serde"] }
 
 # Random number generation
-rand = "0.8"
+rand = "0.9.1"
 
 # Error handling
-anyhow = "1.0"
-thiserror = "1.0"
+anyhow = "1.0.98"
+thiserror = "2.0.12"
 
 # Environment variables
-dotenvy = "0.15"
+dotenvy = "0.15.7"
 
 # Logging
 tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = [
+tracing-subscriber = { version = "0.3.19", features = [
     "env-filter",
     "ansi",
     "fmt",
@@ -60,25 +60,37 @@ tracing-subscriber = { version = "0.3", features = [
     "json",
     "time",
 ] }
-colored = "2.0"
-atty = "0.2"
-url = "2.4"
+colored = "3.0.0"
+atty = "0.2.14"
+url = "2.5.4"
 
 # Security
-bcrypt = "0.15"
-jsonwebtoken = "9.0"
-lazy_static = "1.4"
+bcrypt = "0.17.0"
+jsonwebtoken = "9.3.1"
+lazy_static = "1.5.0"
 
 # Redis
-redis = { version = "0.27", features = ["tokio-comp", "connection-manager"] }
+redis = { version = "0.32.3", features = ["tokio-comp", "connection-manager"] }
 
 # Cryptography
-sha2 = "0.10"
+sha2 = "0.10.9"
 
 # HTTP client (for testing)
-reqwest = { version = "0.12", features = ["json"] }
+reqwest = { version = "0.12.22", features = ["json"] }
+
+# Image processing
+image = "0.25.6"
+
+# S3 compatible storage
+rusty-s3 = "0.5.0"
+
+# File type detection
+infer = "0.19.0"
+
+# Multipart form data
+axum_typed_multipart = "0.16.3"
 
 [dev-dependencies]
 # Testing
-sea-orm = { version = "1.0", features = ["mock"] }
+sea-orm = { version = "1.1.13", features = ["mock"] }
 tokio-test = "0.4"

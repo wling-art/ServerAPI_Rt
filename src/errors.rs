@@ -1,8 +1,12 @@
-use axum::{ http::StatusCode, response::{ IntoResponse, Response }, Json };
+use axum::{
+    http::StatusCode,
+    response::{IntoResponse, Response},
+    Json,
+};
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 use thiserror::Error;
 use utoipa::ToSchema;
-use serde::{ Serialize, Deserialize };
 
 /// API 错误响应模型，用于 OpenAPI 文档
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
@@ -16,23 +20,32 @@ pub struct ApiErrorResponse {
 #[derive(Error, Debug, ToSchema, Serialize, Deserialize)]
 #[serde(tag = "type", content = "message")]
 pub enum ApiError {
-    #[error("Database error: {0}")] Database(String),
+    #[error("Database error: {0}")]
+    Database(String),
 
-    #[error("Validation error: {0}")] Validation(String),
+    #[error("Validation error: {0}")]
+    Validation(String),
 
-    #[error("Authentication error: {0}")] Authentication(String),
+    #[error("Authentication error: {0}")]
+    Authentication(String),
 
-    #[error("Authorization error: {0}")] Authorization(String),
+    #[error("Authorization error: {0}")]
+    Authorization(String),
 
-    #[error("Not found: {0}")] NotFound(String),
+    #[error("Not found: {0}")]
+    NotFound(String),
 
-    #[error("Conflict: {0}")] Conflict(String),
+    #[error("Conflict: {0}")]
+    Conflict(String),
 
-    #[error("Internal server error: {0}")] Internal(String),
+    #[error("Internal server error: {0}")]
+    Internal(String),
 
-    #[error("Bad request: {0}")] BadRequest(String),
+    #[error("Bad request: {0}")]
+    BadRequest(String),
 
-    #[error("Unauthorized: {0}")] Unauthorized(String),
+    #[error("Unauthorized: {0}")]
+    Unauthorized(String),
 }
 
 impl IntoResponse for ApiError {
@@ -40,7 +53,10 @@ impl IntoResponse for ApiError {
         let (status, error_message) = match &self {
             ApiError::Database(msg) => {
                 tracing::error!("Database error: {}", msg);
-                (StatusCode::INTERNAL_SERVER_ERROR, "Database error".to_string())
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Database error".to_string(),
+                )
             }
             ApiError::Validation(msg) => (StatusCode::BAD_REQUEST, msg.clone()),
             ApiError::Authentication(msg) => (StatusCode::UNAUTHORIZED, msg.clone()),
@@ -49,18 +65,19 @@ impl IntoResponse for ApiError {
             ApiError::Conflict(msg) => (StatusCode::CONFLICT, msg.clone()),
             ApiError::Internal(msg) => {
                 tracing::error!("Internal error: {}", msg);
-                (StatusCode::INTERNAL_SERVER_ERROR, "Internal server error".to_string())
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Internal server error".to_string(),
+                )
             }
             ApiError::BadRequest(msg) => (StatusCode::BAD_REQUEST, msg.clone()),
             ApiError::Unauthorized(msg) => (StatusCode::UNAUTHORIZED, msg.clone()),
         };
 
-        let body = Json(
-            json!({
+        let body = Json(json!({
             "error": error_message,
             "status": status.as_u16()
-        })
-        );
+        }));
 
         (status, body).into_response()
     }

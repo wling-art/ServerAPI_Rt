@@ -9,72 +9,48 @@ pub mod user_server;
 
 // User entities
 pub use user::{
-    ActiveModel as UserActiveModel,
-    Column as UserColumn,
-    Entity as UserEntity,
-    Model as UserModel,
+    ActiveModel as UserActiveModel, Column as UserColumn, Entity as UserEntity, Model as UserModel,
     Relation as UserRelation,
 };
 
 // File entities
 pub use file::{
-    ActiveModel as FileActiveModel,
-    Column as FileColumn,
-    Entity as FileEntity,
-    Model as FileModel,
+    ActiveModel as FileActiveModel, Column as FileColumn, Entity as FileEntity, Model as FileModel,
     Relation as FileRelation,
 };
 
 // Server entities
 pub use server::{
-    ActiveModel as ServerActiveModel,
-    Column as ServerColumn,
-    Entity as ServerEntity,
-    Model as ServerModel,
-    Relation as ServerRelation,
+    ActiveModel as ServerActiveModel, Column as ServerColumn, Entity as ServerEntity,
+    Model as ServerModel, Relation as ServerRelation,
 };
 
 // Ticket entities
 pub use ticket::{
-    ActiveModel as TicketActiveModel,
-    Column as TicketColumn,
-    Entity as TicketEntity,
-    Model as TicketModel,
-    Relation as TicketRelation,
+    ActiveModel as TicketActiveModel, Column as TicketColumn, Entity as TicketEntity,
+    Model as TicketModel, Relation as TicketRelation,
 };
 
 // Gallery entities
 pub use gallery::{
-    ActiveModel as GalleryActiveModel,
-    Column as GalleryColumn,
-    Entity as GalleryEntity,
-    Model as GalleryModel,
-    Relation as GalleryRelation,
+    ActiveModel as GalleryActiveModel, Column as GalleryColumn, Entity as GalleryEntity,
+    Model as GalleryModel, Relation as GalleryRelation,
 };
 
 // BanRecord entities
 pub use ban_record::{
-    ActiveModel as BanRecordActiveModel,
-    Column as BanRecordColumn,
-    Entity as BanRecordEntity,
-    Model as BanRecordModel,
-    Relation as BanRecordRelation,
+    ActiveModel as BanRecordActiveModel, Column as BanRecordColumn, Entity as BanRecordEntity,
+    Model as BanRecordModel, Relation as BanRecordRelation,
 };
 
 // ServerStatus entities
 pub use server_status::{
-    ActiveModel as ServerStatusActiveModel,
-    Column as ServerStatusColumn,
-    Entity as ServerStatusEntity,
-    Model as ServerStatusModel,
-    Relation as ServerStatusRelation,
+    ActiveModel as ServerStatusActiveModel, Column as ServerStatusColumn,
+    Entity as ServerStatusEntity, Model as ServerStatusModel, Relation as ServerStatusRelation,
 };
 
 // UserServer entities
 pub use user_server::{
-    ActiveModel as UserServerActiveModel,
-    Column as UserServerColumn,
-    Entity as UserServerEntity,
-    Model as UserServerModel,
-    Relation as UserServerRelation,
+    ActiveModel as UserServerActiveModel, Column as UserServerColumn, Entity as UserServerEntity,
+    Model as UserServerModel, Relation as UserServerRelation,
 };

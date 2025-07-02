@@ -1,4 +1,4 @@
-use sea_orm::{ Database, DatabaseConnection as SeaOrmDatabaseConnection, DbErr };
+use sea_orm::{Database, DatabaseConnection as SeaOrmDatabaseConnection, DbErr};
 use std::sync::Arc;
 
 pub type DatabaseConnection = Arc<SeaOrmDatabaseConnection>;

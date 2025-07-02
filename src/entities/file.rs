@@ -1,5 +1,5 @@
 use sea_orm::entity::prelude::*;
-use serde::{ Deserialize, Serialize };
+use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq, Serialize, Deserialize, ToSchema)]
@@ -36,7 +36,7 @@ impl ActiveModelBehavior for ActiveModel {}
 impl Model {
     /// Generate file hash from content
     pub fn generate_file_hash(file_content: &[u8]) -> String {
-        use sha2::{ Digest, Sha256 };
+        use sha2::{Digest, Sha256};
         let mut hasher = Sha256::new();
         hasher.update(file_content);
         format!("{:x}", hasher.finalize())

@@ -1,8 +1,8 @@
 use server_api_rt::{
     config::Config,
     create_app,
-    logging::{ init_logging, log_startup_info, log_server_ready, log_shutdown },
-    services::{ database::establish_connection, redis::RedisService },
+    logging::{init_logging, log_server_ready, log_shutdown, log_startup_info},
+    services::{database::establish_connection, redis::RedisService},
 };
 use std::net::SocketAddr;
 

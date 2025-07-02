@@ -1,7 +1,7 @@
 use anyhow::Result;
-use chrono::{ Duration, Utc };
-use jsonwebtoken::{ decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation };
-use serde::{ Deserialize, Serialize };
+use chrono::{Duration, Utc};
+use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
+use serde::{Deserialize, Serialize};
 
 use crate::config::Config;
 use crate::services::redis::RedisService;
@@ -57,7 +57,7 @@ impl AuthService {
         let token = encode(
             &Header::default(),
             &claims,
-            &EncodingKey::from_secret(config.jwt.secret.as_ref())
+            &EncodingKey::from_secret(config.jwt.secret.as_ref()),
         )?;
 
         Ok(token)
@@ -73,34 +73,29 @@ impl AuthService {
         let mut validation = Validation::new(Algorithm::HS256);
         validation.validate_exp = true;
 
-        match
-            decode::<Claims>(
-                token,
-                &DecodingKey::from_secret(config.jwt.secret.as_ref()),
-                &validation
-            )
-        {
+        match decode::<Claims>(
+            token,
+            &DecodingKey::from_secret(config.jwt.secret.as_ref()),
+            &validation,
+        ) {
             Ok(token_data) => Ok(token_data.claims),
-            Err(err) =>
-                match err.kind() {
-                    jsonwebtoken::errors::ErrorKind::ExpiredSignature => {
-                        Err("Token has expired".to_string())
-                    }
-                    jsonwebtoken::errors::ErrorKind::InvalidToken =>
-                        Err("Invalid token".to_string()),
-                    jsonwebtoken::errors::ErrorKind::InvalidSignature => {
-                        Err("Invalid token signature".to_string())
-                    }
-                    _ => Err("Token validation failed".to_string()),
+            Err(err) => match err.kind() {
+                jsonwebtoken::errors::ErrorKind::ExpiredSignature => {
+                    Err("Token has expired".to_string())
                 }
+                jsonwebtoken::errors::ErrorKind::InvalidToken => Err("Invalid token".to_string()),
+                jsonwebtoken::errors::ErrorKind::InvalidSignature => {
+                    Err("Invalid token signature".to_string())
+                }
+                _ => Err("Token validation failed".to_string()),
+            },
         }
     }
 
     /// 将令牌加入黑名单
     pub async fn blacklist_token(token: &str) -> Result<()> {
-        let redis = RedisService::instance().ok_or_else(||
-            anyhow::anyhow!("Redis service not initialized")
-        )?;
+        let redis = RedisService::instance()
+            .ok_or_else(|| anyhow::anyhow!("Redis service not initialized"))?;
 
         let key = format!("token:invalid:{}", token);
         redis.set_ex(&key, "1", 86400).await?;
@@ -111,9 +106,8 @@ impl AuthService {
 
     /// 检查令牌是否在黑名单中
     pub async fn is_token_blacklisted(token: &str) -> Result<bool> {
-        let redis = RedisService::instance().ok_or_else(||
-            anyhow::anyhow!("Redis service not initialized")
-        )?;
+        let redis = RedisService::instance()
+            .ok_or_else(|| anyhow::anyhow!("Redis service not initialized"))?;
 
         let key = format!("token:invalid:{}", token);
         redis.exists(&key).await

@@ -1,8 +1,10 @@
 use sea_orm::entity::prelude::*;
-use serde::{ Deserialize, Serialize };
+use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-#[derive(Debug, Clone, PartialEq, Eq, EnumIter, DeriveActiveEnum, Serialize, Deserialize, ToSchema)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, EnumIter, DeriveActiveEnum, Serialize, Deserialize, ToSchema,
+)]
 #[sea_orm(rs_type = "String", db_type = "Enum", enum_name = "role_enum")]
 pub enum RoleEnum {
     #[sea_orm(string_value = "user")]
@@ -11,7 +13,9 @@ pub enum RoleEnum {
     Admin,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, EnumIter, DeriveActiveEnum, Serialize, Deserialize, ToSchema)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, EnumIter, DeriveActiveEnum, Serialize, Deserialize, ToSchema,
+)]
 #[sea_orm(rs_type = "String", db_type = "Enum", enum_name = "ser_role_enum")]
 pub enum SerRoleEnum {
     #[sea_orm(string_value = "owner")]
@@ -34,7 +38,9 @@ pub struct Model {
     pub avatar_hash: Option<String>,
     pub role: RoleEnum,
     pub is_active: bool,
+    #[schema(value_type = String, format = DateTime)]
     pub created_at: ChronoDateTimeUtc,
+    #[schema(value_type = Option<String>, format = DateTime)]
     pub last_login: Option<ChronoDateTimeUtc>,
     pub last_login_ip: Option<String>,
 }

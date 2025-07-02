@@ -1,8 +1,10 @@
 use sea_orm::entity::prelude::*;
-use serde::{ Deserialize, Serialize };
+use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-#[derive(Debug, Clone, PartialEq, Eq, EnumIter, DeriveActiveEnum, Serialize, Deserialize, ToSchema)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, EnumIter, DeriveActiveEnum, Serialize, Deserialize, ToSchema,
+)]
 #[sea_orm(rs_type = "i32", db_type = "Integer")]
 pub enum TicketStatus {
     #[sea_orm(num_value = 0)]
@@ -19,7 +21,9 @@ pub enum TicketStatus {
     Invalid,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, EnumIter, DeriveActiveEnum, Serialize, Deserialize, ToSchema)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, EnumIter, DeriveActiveEnum, Serialize, Deserialize, ToSchema,
+)]
 #[sea_orm(rs_type = "i32", db_type = "Integer")]
 pub enum TicketType {
     #[sea_orm(num_value = 1)]
@@ -38,7 +42,9 @@ pub enum TicketType {
     Other,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, EnumIter, DeriveActiveEnum, Serialize, Deserialize, ToSchema)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, EnumIter, DeriveActiveEnum, Serialize, Deserialize, ToSchema,
+)]
 #[sea_orm(rs_type = "i32", db_type = "Integer")]
 pub enum TicketPriority {
     #[sea_orm(num_value = 1)]
@@ -69,7 +75,9 @@ pub struct Model {
     pub report_reason: Option<String>,
     #[sea_orm(column_type = "Text")]
     pub admin_remark: Option<String>,
+    #[schema(value_type = String, format = DateTime)]
     pub created_at: ChronoDateTimeUtc,
+    #[schema(value_type = String, format = DateTime)]
     pub updated_at: ChronoDateTimeUtc,
 }
 

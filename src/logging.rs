@@ -2,7 +2,7 @@ use colored::*;
 use std::fmt;
 use tracing::Level;
 use tracing_subscriber::{
-    fmt::{ FmtContext, FormatEvent, FormatFields },
+    fmt::{FmtContext, FormatEvent, FormatFields},
     layer::SubscriberExt,
     util::SubscriberInitExt,
     EnvFilter,
@@ -11,17 +11,16 @@ use tracing_subscriber::{
 /// 自定义格式化器，类似于 Gin 框架的日志格式
 pub struct GinLikeFormatter;
 
-impl<S, N> FormatEvent<S, N>
-    for GinLikeFormatter
-    where
-        S: tracing::Subscriber + for<'a> tracing_subscriber::registry::LookupSpan<'a>,
-        N: for<'a> FormatFields<'a> + 'static
+impl<S, N> FormatEvent<S, N> for GinLikeFormatter
+where
+    S: tracing::Subscriber + for<'a> tracing_subscriber::registry::LookupSpan<'a>,
+    N: for<'a> FormatFields<'a> + 'static,
 {
     fn format_event(
         &self,
         ctx: &FmtContext<'_, S, N>,
         mut writer: tracing_subscriber::fmt::format::Writer<'_>,
-        event: &tracing::Event<'_>
+        event: &tracing::Event<'_>,
     ) -> fmt::Result {
         // 本地时区
         let now = chrono::Local::now();
@@ -69,7 +68,7 @@ impl HttpLogFormatter {
         uri: &str,
         status: u16,
         duration: std::time::Duration,
-        remote_addr: Option<&str>
+        remote_addr: Option<&str>,
     ) -> String {
         let method_colored = match method {
             "GET" => method.bright_green().bold(),
@@ -110,7 +109,12 @@ impl HttpLogFormatter {
             "|".bright_black(),
             duration_colored,
             "|".bright_black(),
-            format!("{} {} {}", method_colored, uri.bright_white(), remote_display)
+            format!(
+                "{} {} {}",
+                method_colored,
+                uri.bright_white(),
+                remote_display
+            )
         )
     }
 }
@@ -139,14 +143,16 @@ pub fn init_logging() -> anyhow::Result<()> {
 
     if use_colors {
         // 着色
-        tracing_subscriber
-            ::registry()
+        tracing_subscriber::registry()
             .with(env_filter)
-            .with(tracing_subscriber::fmt::layer().event_format(GinLikeFormatter).with_ansi(true))
+            .with(
+                tracing_subscriber::fmt::layer()
+                    .event_format(GinLikeFormatter)
+                    .with_ansi(true),
+            )
             .init();
     } else {
-        tracing_subscriber
-            ::registry()
+        tracing_subscriber::registry()
             .with(env_filter)
             .with(tracing_subscriber::fmt::layer().with_ansi(false))
             .init();
@@ -159,7 +165,10 @@ pub fn init_logging() -> anyhow::Result<()> {
 pub fn log_startup_info(config: &crate::config::Config) {
     println!();
     println!("{}", "🚀 Server API Starting...".bright_cyan().bold());
-    println!("{}", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".bright_black());
+    println!(
+        "{}",
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".bright_black()
+    );
 
     tracing::info!("🔧 Configuration loaded successfully");
     tracing::info!("🗄️  Database: {}", mask_database_url(&config.database.url));
@@ -167,21 +176,36 @@ pub fn log_startup_info(config: &crate::config::Config) {
     tracing::info!("� Redis: {}:{}", config.redis.host, config.redis.port);
     tracing::info!("�🔐 JWT: Configured");
 
-    println!("{}", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".bright_black());
+    println!(
+        "{}",
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".bright_black()
+    );
 }
 
 /// 服务器启动完成日志
 pub fn log_server_ready(addr: &std::net::SocketAddr) {
     println!();
     println!("{}", "✅ Server is ready!".bright_green().bold());
-    println!("{}", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".bright_black());
-    println!("🏠 Server:      {}", format!("http://{}", addr).bright_white().underline());
-    println!("❤️  Health:     {}", format!("http://{}/health", addr).bright_white().underline());
+    println!(
+        "{}",
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".bright_black()
+    );
+    println!(
+        "🏠 Server:      {}",
+        format!("http://{}", addr).bright_white().underline()
+    );
+    println!(
+        "❤️  Health:     {}",
+        format!("http://{}/health", addr).bright_white().underline()
+    );
     println!(
         "📖 API Docs:    {}",
         format!("http://{}/docs", addr).bright_white().underline()
     );
-    println!("{}", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".bright_black());
+    println!(
+        "{}",
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".bright_black()
+    );
     println!();
 
     tracing::info!("🎉 Server listening on {}", addr);
@@ -214,11 +238,7 @@ macro_rules! log_http_request {
         tracing::info!(
             "{}",
             $crate::logging::HttpLogFormatter::format_request(
-                $method,
-                $uri,
-                $status,
-                $duration,
-                None
+                $method, $uri, $status, $duration, None
             )
         );
     };

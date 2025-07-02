@@ -1,6 +1,6 @@
 use anyhow::Result;
-use redis::{ Client, RedisResult };
 use redis::aio::ConnectionManager;
+use redis::{Client, RedisResult};
 use std::sync::Arc;
 use tokio::sync::OnceCell;
 
@@ -29,9 +29,9 @@ impl RedisService {
         service.ping().await?;
         tracing::info!("✅ Redis connection established");
 
-        REDIS_INSTANCE.set(service).map_err(|_|
-            anyhow::anyhow!("Failed to initialize Redis instance")
-        )?;
+        REDIS_INSTANCE
+            .set(service)
+            .map_err(|_| anyhow::anyhow!("Failed to initialize Redis instance"))?;
 
         Ok(())
     }
@@ -54,12 +54,12 @@ impl RedisService {
     /// 设置键值对，带过期时间（秒）
     pub async fn set_ex(&self, key: &str, value: &str, expire_seconds: u64) -> Result<()> {
         let mut conn = self.manager.clone();
-        let result: RedisResult<()> = redis
-            ::cmd("SETEX")
+        let result: RedisResult<()> = redis::cmd("SETEX")
             .arg(key)
             .arg(expire_seconds)
             .arg(value)
-            .query_async(&mut conn).await;
+            .query_async(&mut conn)
+            .await;
 
         result.map_err(|e| anyhow::anyhow!("Redis SETEX failed: {}", e))
     }
@@ -93,10 +93,8 @@ impl RedisService {
         let mut conn = self.manager.clone();
 
         // 首先使用 SCAN 找到匹配的键
-        let keys: RedisResult<Vec<String>> = redis
-            ::cmd("KEYS")
-            .arg(pattern)
-            .query_async(&mut conn).await;
+        let keys: RedisResult<Vec<String>> =
+            redis::cmd("KEYS").arg(pattern).query_async(&mut conn).await;
 
         match keys {
             Ok(key_list) => {
