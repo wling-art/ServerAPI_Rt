@@ -28,7 +28,7 @@ async fn main() -> anyhow::Result<()> {
 
     // Establish database connection
     tracing::info!("🔌 Connecting to database...");
-    let db = match establish_connection(&config.database.url).await {
+    let db = match establish_connection(&config.database).await {
         Ok(db) => {
             tracing::info!("✅ Database connection established");
             db

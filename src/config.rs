@@ -13,6 +13,11 @@ pub struct Config {
 #[derive(Debug, Deserialize)]
 pub struct DatabaseConfig {
     pub url: String,
+    pub min_connections: u32,
+    pub max_connections: u32,
+    pub connect_timeout: u64,
+    pub acquire_timeout: u64,
+    pub idle_timeout: u64,
 }
 
 #[derive(Debug, Deserialize)]
@@ -46,6 +51,26 @@ impl Config {
 
         let database = DatabaseConfig {
             url: std::env::var("DATABASE_URL")?,
+            min_connections: std::env::var("DB_MIN_CONNECTIONS")
+                .ok()
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(5),
+            max_connections: std::env::var("DB_MAX_CONNECTIONS")
+                .ok()
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(20),
+            connect_timeout: std::env::var("DB_CONNECT_TIMEOUT")
+                .ok()
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(10),
+            acquire_timeout: std::env::var("DB_ACQUIRE_TIMEOUT")
+                .ok()
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(10),
+            idle_timeout: std::env::var("DB_IDLE_TIMEOUT")
+                .ok()
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(600),
         };
 
         let server = ServerConfig {
