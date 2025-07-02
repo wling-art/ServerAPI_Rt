@@ -817,7 +817,6 @@ impl ServerService {
                 let manager_info = ManagerInfo {
                     id: user.id,
                     display_name: user.display_name,
-                    role: role.clone(),
                     is_active: user.is_active,
                     avatar_url,
                 };

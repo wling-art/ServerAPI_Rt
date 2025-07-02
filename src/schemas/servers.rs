@@ -225,8 +225,6 @@ pub struct ManagerInfo {
     pub id: i32,
     /// 显示名称
     pub display_name: String,
-    /// 角色 (owner/admin)
-    pub role: ServerManagerRole,
     /// 是否活跃
     pub is_active: bool,
     /// 头像URL
