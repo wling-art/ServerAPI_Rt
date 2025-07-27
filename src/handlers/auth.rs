@@ -52,10 +52,6 @@ fn get_ip(headers: &HeaderMap) -> Option<String> {
         (status = 400, description = "用户名或密码不能为空", body = ApiErrorResponse),
         (status = 401, description = "用户不存在", body = ApiErrorResponse),
         (status = 500, description = "服务器错误", body = ApiErrorResponse)
-    ),
-    params(
-        ("username_or_email" = String, description = "用户名或邮箱"),
-        ("password" = String, description = "密码")
     )
 )]
 pub async fn login(
