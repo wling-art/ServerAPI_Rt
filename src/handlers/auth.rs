@@ -1,8 +1,4 @@
-use axum::{
-    extract::State,
-    http::HeaderMap,
-    Extension, Json,
-};
+use axum::{extract::State, http::HeaderMap, Extension, Json};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use serde::Deserialize;
 use tokio::task;
@@ -135,7 +131,7 @@ pub async fn login(
     description = "登出当前用户，清除 JWT 访问令牌",
     tag = "auth",
     responses(
-        (status = 200, description = "登出成功"),
+        (status = 200, description = "登出成功", body = SuccessResponse),
         (status = 401, description = "未登录或令牌无效", body = ApiErrorResponse),
         (status = 500, description = "服务器错误", body = ApiErrorResponse)
     ),
