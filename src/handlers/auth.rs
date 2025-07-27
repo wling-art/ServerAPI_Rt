@@ -12,9 +12,12 @@ use crate::{
 };
 use bcrypt::verify;
 
+/// 用户登录请求数据结构体
 #[derive(Deserialize, utoipa::IntoParams, utoipa::ToSchema)]
 pub struct UserLoginData {
+    /// 用户名或邮箱（识别是否包含 @ 判断是否有邮箱）
     username_or_email: String,
+    /// 密码
     password: String,
 }
 
