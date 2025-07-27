@@ -508,7 +508,7 @@ impl ServerService {
             .map_err(|e| crate::errors::ApiError::Database(e.to_string()))?
             .ok_or_else(|| crate::errors::ApiError::NotFound("未找到该服务器".to_string()))?;
 
-        // 检查用户权限 (这里需要根据你的权限逻辑实现)
+        // 检查用户权限
         Self::check_server_edit_permission(db, server_id, current_user_id).await?;
 
         // 验证更新字段不能为空
@@ -589,7 +589,7 @@ impl ServerService {
 
         match user_server {
             Some(us) => {
-                // 检查是否有编辑权限（假设 "admin" 和 "owner" 有编辑权限）
+                // 检查是否有编辑权限
                 if us.role == "admin" || us.role == "owner" {
                     Ok(())
                 } else {
