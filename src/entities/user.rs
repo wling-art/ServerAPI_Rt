@@ -1,3 +1,4 @@
+use chrono::{DateTime, Utc};
 use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -38,10 +39,8 @@ pub struct Model {
     pub avatar_hash_id: Option<String>,
     pub role: RoleEnum,
     pub is_active: bool,
-    #[schema(value_type = String, format = DateTime)]
-    pub created_at: ChronoDateTimeUtc,
-    #[schema(value_type = Option<String>, format = DateTime)]
-    pub last_login: Option<ChronoDateTimeUtc>,
+    pub created_at: DateTime<Utc>,
+    pub last_login: Option<DateTime<Utc>>,
     pub last_login_ip: Option<String>,
 }
 

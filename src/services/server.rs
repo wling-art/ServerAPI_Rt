@@ -1,9 +1,5 @@
 use std::collections::HashMap;
 
-use sea_orm::*;
-use serde_json::Value;
-use validator::Validate;
-
 use crate::entities::{server, ServerEntity, UserEntity};
 use crate::{
     config::S3Config,
@@ -20,7 +16,11 @@ use crate::{
     },
     services::{database::DatabaseConnection, file_upload::FileUploadService},
 };
+use chrono::Utc;
+use sea_orm::*;
 use sea_orm::{ActiveModelTrait, Set};
+use serde_json::Value;
+use validator::Validate;
 /// 分页结果结构体
 pub struct PaginatedServerResult {
     /// 当前页的服务器列表
@@ -873,7 +873,7 @@ impl ServerService {
             gallery_id
         } else {
             let new_gallery = gallery::ActiveModel {
-                created_at: Set(chrono::Utc::now().into()),
+                created_at: Set(Utc::now().into()),
                 ..Default::default()
             };
             let gallery = GalleryEntity::insert(new_gallery)

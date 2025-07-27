@@ -29,6 +29,7 @@ pub struct ServerConfig {
 #[derive(Debug, Deserialize)]
 pub struct JwtConfig {
     pub secret: String,
+    pub expiration: u64,
 }
 
 #[derive(Debug, Deserialize)]
@@ -82,6 +83,10 @@ impl Config {
 
         let jwt = JwtConfig {
             secret: std::env::var("JWT_SECRET")?,
+            expiration: std::env::var("JWT_EXPIRATION")
+                .ok()
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(30 * 24 * 60 * 60),
         };
 
         let redis = RedisConfig {

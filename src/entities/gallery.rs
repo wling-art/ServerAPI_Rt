@@ -1,14 +1,14 @@
 use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
+use chrono::{DateTime, Utc};
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq, Serialize, Deserialize, ToSchema)]
 #[sea_orm(table_name = "gallery")]
 pub struct Model {
     #[sea_orm(primary_key)]
     pub id: i32,
-    #[schema(value_type = String, format = DateTime)]
-    pub created_at: ChronoDateTimeUtc,
+    pub created_at: DateTime<Utc>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

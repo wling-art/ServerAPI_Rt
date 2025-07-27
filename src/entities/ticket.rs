@@ -1,6 +1,7 @@
 use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
+use chrono::{DateTime, Utc};
 
 #[derive(
     Debug, Clone, PartialEq, Eq, EnumIter, DeriveActiveEnum, Serialize, Deserialize, ToSchema,
@@ -75,10 +76,8 @@ pub struct Model {
     pub report_reason: Option<String>,
     #[sea_orm(column_type = "Text")]
     pub admin_remark: Option<String>,
-    #[schema(value_type = String, format = DateTime)]
-    pub created_at: ChronoDateTimeUtc,
-    #[schema(value_type = String, format = DateTime)]
-    pub updated_at: ChronoDateTimeUtc,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

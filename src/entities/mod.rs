@@ -3,6 +3,7 @@ pub mod file;
 pub mod gallery;
 pub mod gallery_image;
 pub mod server;
+pub mod server_log;
 pub mod server_status;
 pub mod ticket;
 pub mod user;
@@ -26,6 +27,12 @@ pub use server::{
     Model as ServerModel, Relation as ServerRelation,
 };
 
+// Server Log entities
+pub use server_log::{
+    ActiveModel as ServerLogActiveModel, Column as ServerLogColumn, Entity as ServerLogEntity,
+    Model as ServerLogModel,
+};
+
 // Ticket entities
 pub use ticket::{
     ActiveModel as TicketActiveModel, Column as TicketColumn, Entity as TicketEntity,
@@ -40,8 +47,8 @@ pub use gallery::{
 
 // GalleryImage entities
 pub use gallery_image::{
-    ActiveModel as GalleryImageActiveModel, Column as GalleryImageColumn, Entity as GalleryImageEntity,
-    Model as GalleryImageModel, Relation as GalleryImageRelation,
+    ActiveModel as GalleryImageActiveModel, Column as GalleryImageColumn,
+    Entity as GalleryImageEntity, Model as GalleryImageModel, Relation as GalleryImageRelation,
 };
 
 // BanRecord entities

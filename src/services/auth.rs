@@ -1,10 +1,15 @@
+use crate::config::Config;
+use crate::entities::user;
+use crate::services::redis::RedisService;
 use anyhow::Result;
 use chrono::{Duration, Utc};
 use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
+use sea_orm::{ActiveModelTrait, DatabaseConnection};
 use serde::{Deserialize, Serialize};
-
-use crate::config::Config;
-use crate::services::redis::RedisService;
+use utoipa::{
+    openapi::security::{HttpAuthScheme, HttpBuilder, SecurityScheme},
+    Modify,
+};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Claims {
@@ -14,6 +19,12 @@ pub struct Claims {
     pub id: i32,
     /// 过期时间
     pub exp: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct JwtData {
+    pub user_id: i32,
+    pub username: String,
 }
 
 impl Claims {
@@ -32,12 +43,6 @@ impl Claims {
             }
         }
     }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct JwtData {
-    pub user_id: i32,
-    pub username: String,
 }
 
 pub struct AuthService;
@@ -112,27 +117,37 @@ impl AuthService {
         let key = format!("token:invalid:{}", token);
         redis.exists(&key).await
     }
+
+    /// 更新最后登陆信息
+    pub async fn update_last_login(
+        db: &DatabaseConnection,
+        user_id: i32,
+        ip: Option<String>,
+    ) -> Result<()> {
+        let now = Utc::now();
+        let user = user::ActiveModel {
+            id: sea_orm::Set(user_id),
+            last_login: sea_orm::Set(Some(now)),
+            last_login_ip: sea_orm::Set(ip),
+            ..Default::default()
+        };
+
+        user.update(db).await.map(|_| ()).map_err(|e| e.into())
+    }
 }
-
-
-use utoipa::{
-    Modify,
-    openapi::security::{HttpAuthScheme, HttpBuilder, SecurityScheme},
-};
 
 pub struct SecurityAddon;
 
 impl Modify for SecurityAddon {
     fn modify(&self, openapi: &mut utoipa::openapi::OpenApi) {
-        // components 一定要存在，不然先创建一个
         let components = openapi.components.get_or_insert(Default::default());
 
         components.add_security_scheme(
-            "bearer_auth",                     // ← ② 安全方案的名字
-            SecurityScheme::Http(              // ← ③ 方案类型：HTTP
+            "bearer_auth",
+            SecurityScheme::Http(
                 HttpBuilder::new()
-                    .scheme(HttpAuthScheme::Bearer) // ← ④ Bearer
-                    .bearer_format("JWT")           // ← ⑤ 文档说明，可省
+                    .scheme(HttpAuthScheme::Bearer)
+                    .bearer_format("JWT")
                     .build(),
             ),
         );

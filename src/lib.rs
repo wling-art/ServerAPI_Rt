@@ -7,10 +7,11 @@ pub mod middleware;
 pub mod schemas;
 pub mod services;
 
-use crate::handlers::servers;
+use crate::handlers::{auth, servers};
 use crate::middleware::{auth::optional_auth_middleware, simple_http_logging_middleware};
 use crate::services::auth::SecurityAddon;
 use crate::services::database::DatabaseConnection;
+use axum::routing::post;
 use axum::{
     middleware as axum_middleware,
     routing::{delete, get},
@@ -30,7 +31,8 @@ use utoipa_swagger_ui::SwaggerUi;
         servers::get_server_gallery,
         servers::upload_gallery_image,
         servers::delete_gallery_image,
-        servers::get_total_players
+        servers::get_total_players,
+        auth::login
     ),
     components(
         schemas(
@@ -48,6 +50,7 @@ use utoipa_swagger_ui::SwaggerUi;
             schemas::servers::GalleryImageRequest,
             schemas::servers::SuccessResponse,
             schemas::servers::ServerTotalPlayers,
+            schemas::auth::AuthToken,
             entities::server::AuthModeEnum,
             entities::server::ServerTypeEnum,
             crate::errors::ApiErrorResponse,
@@ -77,8 +80,11 @@ pub fn create_app(db: DatabaseConnection) -> Router {
             "/{server_id}/gallery/{image_id}",
             delete(servers::delete_gallery_image),
         );
+    let auth_router = Router::new().route("/login", post(auth::login));
+
     Router::new()
         .nest("/v2/servers", server_router)
+        .nest("/v2/auth", auth_router)
         // Health check
         .route("/health", get(|| async { "OK" }))
         // Swagger UI
