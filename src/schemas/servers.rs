@@ -25,7 +25,6 @@ impl FromStr for ApiServerType {
     }
 }
 
-
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub enum ApiAuthMode {
     #[serde(rename = "OFFICIAL")]

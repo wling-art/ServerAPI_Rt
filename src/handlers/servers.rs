@@ -237,8 +237,7 @@ pub async fn update_server(
 
     // 调用服务层更新服务器
     let updated_server =
-        ServerService::update_server_by_id(db, &s3_config, server_id, update_data, user.id)
-            .await?;
+        ServerService::update_server_by_id(db, &s3_config, server_id, update_data, user.id).await?;
 
     Ok(Json(updated_server))
 }
