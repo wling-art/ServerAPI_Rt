@@ -136,6 +136,7 @@ pub async fn login(
     tag = "auth",
     responses(
         (status = 200, description = "登出成功"),
+        (status = 401, description = "未登录或令牌无效", body = ApiErrorResponse),
         (status = 500, description = "服务器错误", body = ApiErrorResponse)
     ),
     security(

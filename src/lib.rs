@@ -106,7 +106,9 @@ pub fn create_app(app_state: AppState) -> Router {
             "/{server_id}/gallery/{image_id}",
             delete(servers::delete_gallery_image),
         );
-    let auth_router = Router::new().route("/login", post(auth::login));
+    let auth_router = Router::new()
+        .route("/login", post(auth::login))
+        .route("/logout", post(auth::logout));
 
     Router::new()
         .nest("/v2/servers", server_router)
