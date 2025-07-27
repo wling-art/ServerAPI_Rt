@@ -4,7 +4,8 @@ use crate::{
         GalleryImageRequest, GalleryImageSchema, ServerDetail, ServerGallery, ServerListResponse,
         ServerManagersResponse, ServerTotalPlayers, SuccessResponse, UpdateServerRequest,
     },
-    services::{auth::Claims, server::ServerService}, AppState,
+    services::{auth::Claims, server::ServerService},
+    AppState,
 };
 use axum::{
     extract::{Extension, Path, Query, State},
@@ -103,7 +104,7 @@ pub async fn list_servers(
     let db = &app_state.db;
     let user_id = user_claims.map(|Extension(claims)| claims.id);
 
-    let result = ServerService::get_servers_with_filters(&db, user_id, &query).await?;
+    let result = ServerService::get_servers_with_filters(db, user_id, &query).await?;
 
     let total = result.total;
     let total_pages = ((total as f64) / (query.page_size as f64)).ceil() as i64;
@@ -160,7 +161,7 @@ pub async fn get_server_detail(
     let full_info = query.full_info.unwrap_or(false);
     let db = &app_state.db;
 
-    let result = ServerService::get_server_detail(&db, user_id, server_id, full_info).await?;
+    let result = ServerService::get_server_detail(db, user_id, server_id, full_info).await?;
 
     Ok(Json(result))
 }
@@ -236,7 +237,7 @@ pub async fn update_server(
 
     // 调用服务层更新服务器
     let updated_server =
-        ServerService::update_server_by_id(&db, &s3_config, server_id, update_data, user.id)
+        ServerService::update_server_by_id(db, &s3_config, server_id, update_data, user.id)
             .await?;
 
     Ok(Json(updated_server))
@@ -270,7 +271,7 @@ pub async fn get_server_managers(
     Path(server_id): Path<i32>,
 ) -> ApiResult<Json<ServerManagersResponse>> {
     let db = &app_state.db;
-    let result = ServerService::get_server_managers(&db, server_id).await?;
+    let result = ServerService::get_server_managers(db, server_id).await?;
     Ok(Json(result))
 }
 
@@ -304,7 +305,7 @@ pub async fn get_server_gallery(
     Path(server_id): Path<i32>,
 ) -> ApiResult<Json<ServerGallery>> {
     let db = &app_state.db;
-    let result = ServerService::get_server_gallery(&db, server_id).await?;
+    let result = ServerService::get_server_gallery(db, server_id).await?;
     Ok(Json(result))
 }
 
@@ -384,7 +385,7 @@ pub async fn upload_gallery_image(
 
     // 检查用户是否有这个服务器的编辑权
     let has_permission =
-        ServerService::has_server_edit_permission(&db, claims.id, server_id).await?;
+        ServerService::has_server_edit_permission(db, claims.id, server_id).await?;
     if !has_permission {
         return Err(ApiError::Forbidden(
             "权限不足，只有服务器管理员可以添加画册图片".to_string(),
@@ -393,10 +394,10 @@ pub async fn upload_gallery_image(
 
     // 从环境变量获取S3配置
     let config = crate::config::Config::from_env()
-        .map_err(|e| ApiError::Internal(format!("配置加载失败: {}", e)))?;
+        .map_err(|e| ApiError::Internal(format!("配置加载失败: {e}")))?;
 
     // 添加画册图片
-    ServerService::add_gallery_image(&db, &config.s3, server_id, &gallery_data).await?;
+    ServerService::add_gallery_image(db, &config.s3, server_id, &gallery_data).await?;
 
     Ok(Json(serde_json::json!({
         "message": "成功添加服务器画册图片"
@@ -477,7 +478,7 @@ pub async fn delete_gallery_image(
     let db = &app_state.db;
     // 检查用户是否有这个服务器的编辑权
     let has_permission =
-        ServerService::has_server_edit_permission(&db, claims.id, server_id).await?;
+        ServerService::has_server_edit_permission(db, claims.id, server_id).await?;
     if !has_permission {
         return Err(ApiError::Forbidden(
             "权限不足，只有服务器管理员可以删除画册图片".to_string(),
@@ -486,10 +487,10 @@ pub async fn delete_gallery_image(
 
     // 从环境变量获取S3配置
     let config = crate::config::Config::from_env()
-        .map_err(|e| ApiError::Internal(format!("配置加载失败: {}", e)))?;
+        .map_err(|e| ApiError::Internal(format!("配置加载失败: {e}")))?;
 
     // 删除画册图片
-    ServerService::delete_gallery_image(&db, &config.s3, server_id, image_id).await?;
+    ServerService::delete_gallery_image(db, &config.s3, server_id, image_id).await?;
 
     Ok(Json(serde_json::json!({
         "message": "成功删除服务器画册图片"
@@ -518,6 +519,6 @@ pub async fn get_total_players(
     State(app_state): State<AppState>,
 ) -> ApiResult<Json<ServerTotalPlayers>> {
     let db = &app_state.db;
-    let result = ServerService::total_players(&db).await?;
+    let result = ServerService::total_players(db).await?;
     Ok(Json(result))
 }

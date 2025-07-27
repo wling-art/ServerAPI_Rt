@@ -71,7 +71,7 @@ impl ServerService {
 
         // 应用标签过滤（在应用层面，因为 JSON 字段难以在数据库层优化）
         if let Some(required_tags) = &list_query.tags {
-            servers.retain(|server| Self::server_has_required_tags(&server.tags, &required_tags));
+            servers.retain(|server| Self::server_has_required_tags(&server.tags, required_tags));
         }
 
         // 记录过滤后的总数
@@ -179,7 +179,7 @@ impl ServerService {
         }
 
         // 查询服务器基本信息
-        let server = ServerEntity::find_by_id(server_id as i32)
+        let server = ServerEntity::find_by_id(server_id)
             .one(db.as_ref())
             .await?
             .ok_or_else(|| crate::errors::ApiError::NotFound("服务器不存在".to_string()))?;
@@ -228,10 +228,7 @@ impl ServerService {
         // 转换为 ServerDetail
         let status = if let Some(status_model) = server_status {
             if let Some(ref stat_data) = status_model.stat_data {
-                match Self::parse_server_status(stat_data) {
-                    Ok(parsed_status) => Some(parsed_status),
-                    Err(_) => None,
-                }
+                Self::parse_server_status(stat_data).ok()
             } else {
                 None
             }
@@ -342,10 +339,10 @@ impl ServerService {
                 let tags = Self::parse_server_tags(&server.tags);
 
                 // 转换类型
-                let server_type =
-                    ApiServerType::from_str(&server.server_type).unwrap_or(ApiServerType::Java);
-                let auth_mode =
-                    ApiAuthMode::from_str(&server.auth_mode).unwrap_or(ApiAuthMode::Official);
+                let server_type: ApiServerType =
+                    server.server_type.parse().unwrap_or(ApiServerType::Java);
+                let auth_mode: ApiAuthMode =
+                    server.auth_mode.parse().unwrap_or(ApiAuthMode::Official);
 
                 // 处理服务器状态
                 let status = status_map.get(&server.id).and_then(|status_model| {
@@ -397,14 +394,11 @@ impl ServerService {
         }
 
         match serde_json::from_str::<Value>(tags_json) {
-            Ok(json_value) => match json_value.as_array() {
-                Some(arr) => Some(
-                    arr.iter()
-                        .filter_map(|v| v.as_str().map(|s| s.to_string()))
-                        .collect(),
-                ),
-                None => None,
-            },
+            Ok(json_value) => json_value.as_array().map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                    .collect()
+            }),
             Err(_) => None,
         }
     }
@@ -417,7 +411,7 @@ impl ServerService {
         cover_hash
             .as_ref()
             .and_then(|hash| cover_file_map.get(hash))
-            .map(|file_path| file_path.clone())
+            .cloned()
     }
 
     /// 构建图片URL
@@ -425,7 +419,7 @@ impl ServerService {
         if file_path.starts_with("http://") || file_path.starts_with("https://") {
             file_path.to_string()
         } else {
-            format!("/static/{}", file_path)
+            format!("/static/{file_path}")
         }
     }
 
@@ -524,7 +518,7 @@ impl ServerService {
         // 执行各项验证
         update_data
             .validate()
-            .map_err(|e| crate::errors::ApiError::BadRequest(format!("参数验证失败: {}", e)))?;
+            .map_err(|e| crate::errors::ApiError::BadRequest(format!("参数验证失败: {e}")))?;
 
         // 处理封面文件上传
         let original_cover_hash = server.cover_hash.clone();
@@ -548,7 +542,7 @@ impl ServerService {
 
         // 序列化标签为 JSON
         let tags_json = serde_json::to_string(&update_data.tags)
-            .map_err(|e| crate::errors::ApiError::Internal(format!("标签序列化失败: {}", e)))?;
+            .map_err(|e| crate::errors::ApiError::Internal(format!("标签序列化失败: {e}")))?;
 
         // 更新服务器信息
         let mut server_active: server::ActiveModel = server.into();
@@ -622,7 +616,7 @@ impl ServerService {
             .await
             .map_err(|e| {
                 tracing::error!("查询服务器失败: server_id={}, error={}", server_id, e);
-                crate::errors::ApiError::Database(format!("查询服务器失败: {}", e))
+                crate::errors::ApiError::Database(format!("查询服务器失败: {e}"))
             })?
             .ok_or_else(|| {
                 tracing::warn!("服务器不存在: server_id={}", server_id);
@@ -641,7 +635,7 @@ impl ServerService {
         Ok(ServerGallery {
             id: server.id,
             name: server.name,
-            gallery_images: gallery_images,
+            gallery_images,
         })
     }
 
@@ -673,7 +667,7 @@ impl ServerService {
             .await
             .map_err(|e| {
                 tracing::error!("查询相册图片失败: gallery_id={}, error={}", gallery_id, e);
-                crate::errors::ApiError::Database(format!("查询相册图片失败: {}", e))
+                crate::errors::ApiError::Database(format!("查询相册图片失败: {e}"))
             })?;
 
         if gallery_images.is_empty() {
@@ -700,7 +694,7 @@ impl ServerService {
             .await
             .map_err(|e| {
                 tracing::error!("查询图片文件失败: hashes={:?}, error={}", image_hashes, e);
-                crate::errors::ApiError::Database(format!("查询图片文件失败: {}", e))
+                crate::errors::ApiError::Database(format!("查询图片文件失败: {e}"))
             })?;
 
         // 构建文件映射表
@@ -797,8 +791,7 @@ impl ServerService {
                 let avatar_url = if let Some(avatar_hash_id) = &user.avatar_hash_id {
                     let file_path = avatar_file_map.get(avatar_hash_id).ok_or_else(|| {
                         crate::errors::ApiError::Internal(format!(
-                            "头像文件不存在: {}",
-                            avatar_hash_id
+                            "头像文件不存在: {avatar_hash_id}"
                         ))
                     })?;
 
@@ -866,14 +859,14 @@ impl ServerService {
         // 验证标题和描述
         gallery_data
             .validate()
-            .map_err(|e| crate::errors::ApiError::BadRequest(format!("参数验证失败: {}", e)))?;
+            .map_err(|e| crate::errors::ApiError::BadRequest(format!("参数验证失败: {e}")))?;
 
         // 创建图库（如果不存在）
         let gallery_id = if let Some(gallery_id) = server.gallery_id {
             gallery_id
         } else {
             let new_gallery = gallery::ActiveModel {
-                created_at: Set(Utc::now().into()),
+                created_at: Set(Utc::now()),
                 ..Default::default()
             };
             let gallery = GalleryEntity::insert(new_gallery)

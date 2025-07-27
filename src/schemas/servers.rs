@@ -1,6 +1,6 @@
 use axum_typed_multipart::{FieldData, TryFromMultipart};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::{collections::HashMap, str::FromStr};
 use utoipa::ToSchema;
 use validator::Validate;
 
@@ -13,22 +13,18 @@ pub enum ApiServerType {
     Bedrock,
 }
 
-impl ApiServerType {
-    pub fn from_str(s: &str) -> Option<Self> {
-        match s {
-            "JAVA" => Some(Self::Java),
-            "BEDROCK" => Some(Self::Bedrock),
-            _ => None,
-        }
-    }
+impl FromStr for ApiServerType {
+    type Err = ();
 
-    pub fn to_string(&self) -> String {
-        match self {
-            Self::Java => "JAVA".to_string(),
-            Self::Bedrock => "BEDROCK".to_string(),
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "JAVA" => Ok(Self::Java),
+            "BEDROCK" => Ok(Self::Bedrock),
+            _ => Err(()),
         }
     }
 }
+
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub enum ApiAuthMode {
@@ -40,21 +36,15 @@ pub enum ApiAuthMode {
     Yggdrasil,
 }
 
-impl ApiAuthMode {
-    pub fn from_str(s: &str) -> Option<Self> {
-        match s {
-            "OFFICIAL" => Some(Self::Official),
-            "OFFLINE" => Some(Self::Offline),
-            "YGGDRASIL" => Some(Self::Yggdrasil),
-            _ => None,
-        }
-    }
+impl FromStr for ApiAuthMode {
+    type Err = ();
 
-    pub fn to_string(&self) -> String {
-        match self {
-            Self::Official => "OFFICIAL".to_string(),
-            Self::Offline => "OFFLINE".to_string(),
-            Self::Yggdrasil => "YGGDRASIL".to_string(),
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "OFFICIAL" => Ok(Self::Official),
+            "OFFLINE" => Ok(Self::Offline),
+            "YGGDRASIL" => Ok(Self::Yggdrasil),
+            _ => Err(()),
         }
     }
 }

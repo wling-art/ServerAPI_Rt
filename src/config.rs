@@ -36,6 +36,7 @@ pub struct JwtConfig {
 pub struct RedisConfig {
     pub host: String,
     pub port: u16,
+    pub password: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -94,6 +95,7 @@ impl Config {
             port: std::env::var("REDIS_PORT")
                 .unwrap_or_else(|_| "6379".to_string())
                 .parse()?,
+            password: std::env::var("REDIS_PASSWORD").ok(),
         };
 
         let s3 = S3Config {

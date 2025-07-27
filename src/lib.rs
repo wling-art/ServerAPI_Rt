@@ -119,6 +119,9 @@ pub fn create_app(app_state: AppState) -> Router {
         .layer(CorsLayer::permissive())
         // Add HTTP logging middleware
         .layer(axum_middleware::from_fn(simple_http_logging_middleware))
-        .layer(axum_middleware::from_fn(optional_auth_middleware))
+        .layer(axum_middleware::from_fn_with_state(
+            app_state.clone(),
+            optional_auth_middleware,
+        ))
         .with_state(app_state)
 }

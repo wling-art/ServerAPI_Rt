@@ -1,9 +1,9 @@
 use server_api_rt::{
-    config::AppState, create_app, logging::{init_logging, log_server_ready, log_shutdown}, services::redis::RedisService
+    create_app,
+    logging::{init_logging, log_server_ready, log_shutdown},
+    services::redis::RedisService, AppState,
 };
 use std::net::SocketAddr;
-
-
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {

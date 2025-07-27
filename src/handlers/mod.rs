@@ -1,2 +1,2 @@
-pub mod servers;
 pub mod auth;
+pub mod servers;

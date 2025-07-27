@@ -116,12 +116,12 @@ fn extract_module_name(target: &str) -> String {
     if module.len() > MAX_MODULE_LEN {
         format!("{:.len$}", module, len = MAX_MODULE_LEN - 2) + ".."
     } else {
-        format!("{:<len$}", module, len = MAX_MODULE_LEN)
+        format!("{module:<MAX_MODULE_LEN$}")
     }
 }
 
 fn format_method(method: &str) -> ColoredString {
-    let padded = format!("{:<6}", method);
+    let padded = format!("{method:<6}");
     match method {
         "GET" => padded.bright_green(),
         "POST" => padded.bright_blue(),
@@ -144,7 +144,7 @@ fn format_status(status: u16) -> ColoredString {
 
 fn format_duration(duration: std::time::Duration) -> ColoredString {
     let duration_ms = duration.as_secs_f64() * 1000.0;
-    let duration_str = format!("{:>7.1}ms", duration_ms);
+    let duration_str = format!("{duration_ms:>7.1}ms");
 
     if duration_ms < 100.0 {
         duration_str.bright_green()
@@ -157,7 +157,7 @@ fn format_duration(duration: std::time::Duration) -> ColoredString {
 
 fn format_remote_addr(remote_addr: Option<&str>) -> ColoredString {
     match remote_addr {
-        Some(addr) => format!("from {}", addr).bright_black(),
+        Some(addr) => format!("from {addr}").bright_black(),
         None => "".normal(),
     }
 }
@@ -209,15 +209,15 @@ pub fn log_server_ready(addr: &std::net::SocketAddr) {
     println!("{}", "─".repeat(60).bright_green());
     println!(
         "  🌐 服务地址: {}",
-        format!("http://{}", addr).bright_white().underline()
+        format!("http://{addr}").bright_white().underline()
     );
     println!(
         "  ❤️  健康检查: {}",
-        format!("http://{}/health", addr).bright_green().underline()
+        format!("http://{addr}/health").bright_green().underline()
     );
     println!(
         "  📚 API 文档: {}",
-        format!("http://{}/docs", addr).bright_blue().underline()
+        format!("http://{addr}/docs").bright_blue().underline()
     );
     println!("{}", "─".repeat(60).bright_green());
     println!();

@@ -38,19 +38,19 @@ impl FileUploadService {
     /// 对于复合扩展名（如 .backup.tar.gz），会返回完整的扩展名部分
     pub fn get_file_extension(filename: &str) -> String {
         // 特殊处理已知的复合扩展名模式
-        if let Some(_) = filename.find(".backup.tar.gz") {
+        if filename.contains(".backup.tar.gz") {
             return ".backup.tar.gz".to_string();
         }
         if let Some(pos) = filename.find(".backup.tar") {
             return filename[pos..].to_string();
         }
-        if let Some(_) = filename.find(".tar.gz") {
+        if filename.contains(".tar.gz") {
             return ".tar.gz".to_string();
         }
-        if let Some(_) = filename.find(".tar.bz2") {
+        if filename.contains(".tar.bz2") {
             return ".tar.bz2".to_string();
         }
-        if let Some(_) = filename.find(".tar.xz") {
+        if filename.contains(".tar.xz") {
             return ".tar.xz".to_string();
         }
         // 默认返回最后的扩展名
@@ -134,7 +134,7 @@ impl FileUploadService {
         // 创建 S3 配置
         let credentials = Self::create_s3_credentials(s3_config);
         let bucket = Self::create_s3_bucket(s3_config)
-            .map_err(|e| ApiError::Internal(format!("S3 bucket 配置失败: {}", e)))?;
+            .map_err(|e| ApiError::Internal(format!("S3 bucket 配置失败: {e}")))?;
 
         // 生成上传的预签名 URL
         let action = bucket.put_object(Some(&credentials), &s3_object_name);
@@ -146,7 +146,7 @@ impl FileUploadService {
             .body(file_content.clone())
             .send()
             .await
-            .map_err(|e| ApiError::Internal(format!("文件上传失败: {}", e)))?;
+            .map_err(|e| ApiError::Internal(format!("文件上传失败: {e}")))?;
 
         if !response.status().is_success() {
             return Err(ApiError::Internal(format!(
@@ -236,7 +236,7 @@ impl FileUploadService {
     pub async fn delete_file(s3_config: &S3Config, hash_id: &str) -> ApiResult<()> {
         let credentials = Self::create_s3_credentials(s3_config);
         let bucket = Self::create_s3_bucket(s3_config)
-            .map_err(|e| ApiError::Internal(format!("S3 配置错误: {}", e)))?;
+            .map_err(|e| ApiError::Internal(format!("S3 配置错误: {e}")))?;
 
         let delete_action = bucket.delete_object(Some(&credentials), hash_id);
         let url = delete_action.sign(Duration::from_secs(60));
@@ -246,7 +246,7 @@ impl FileUploadService {
             .delete(url.as_str())
             .send()
             .await
-            .map_err(|e| ApiError::Internal(format!("删除文件失败: {}", e)))?;
+            .map_err(|e| ApiError::Internal(format!("删除文件失败: {e}")))?;
 
         if !response.status().is_success() {
             return Err(ApiError::Internal("删除 S3 文件失败".to_string()));

@@ -1,4 +1,8 @@
-use axum::{extract::State, http::HeaderMap, Json};
+use axum::{
+    extract::State,
+    http::HeaderMap,
+    Extension, Json,
+};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use serde::Deserialize;
 use tokio::task;
@@ -6,8 +10,10 @@ use tokio::task;
 use crate::{
     entities::user,
     errors::{ApiError, ApiErrorResponse, ApiResult},
-    schemas::auth::AuthToken,
-    services::auth::{AuthService, JwtData}, AppState,
+    middleware::UserClaims,
+    schemas::{auth::AuthToken, servers::SuccessResponse},
+    services::auth::{AuthService, JwtData},
+    AppState,
 };
 use bcrypt::verify;
 
@@ -108,7 +114,7 @@ pub async fn login(
             tokio::spawn(async move {
                 if let Err(e) = AuthService::update_last_login(&db_clone, user_id, client_ip).await
                 {
-                    eprintln!("更新最后登录时间失败: {:?}", e);
+                    eprintln!("更新最后登录时间失败: {e:?}");
                 }
             });
 
@@ -119,5 +125,34 @@ pub async fn login(
         }
         Ok(false) => Err(ApiError::Unauthorized("密码错误".to_string())),
         Err(_) => Err(ApiError::InternalServerError("密码校验失败".to_string())),
+    }
+}
+
+#[utoipa::path(
+    post,
+    path = "/v2/auth/logout",
+    summary = "用户登出",
+    description = "登出当前用户，清除 JWT 访问令牌",
+    tag = "auth",
+    responses(
+        (status = 200, description = "登出成功"),
+        (status = 500, description = "服务器错误", body = ApiErrorResponse)
+    ),
+    security(
+        ("bearer_auth" = [])
+    )
+)]
+pub async fn logout(
+    State(app_state): State<AppState>,
+    user_claims: Option<Extension<UserClaims>>,
+) -> ApiResult<Json<SuccessResponse>> {
+    if let Some(claims) = user_claims {
+        AuthService::blacklist_token(&claims.raw_token, &app_state.config).await?;
+
+        Ok(Json(SuccessResponse {
+            message: "登出成功".to_string(),
+        }))
+    } else {
+        Err(ApiError::Unauthorized("未登录或令牌无效".to_string()))
     }
 }

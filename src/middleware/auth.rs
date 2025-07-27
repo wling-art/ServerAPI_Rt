@@ -1,33 +1,45 @@
 use axum::{
-    extract::{Request},
+    extract::{Request, State},
     http::header::AUTHORIZATION,
     middleware::Next,
-    response::Response,
+    response::{IntoResponse, Response},
 };
 
 use crate::{
-    config::{Config},
-    services::{auth::AuthService},
+    errors::ApiError,
+    services::auth::{AuthService, Claims},
+    AppState,
 };
 
-/// Optional authentication middleware - extracts user info if present but doesn't require it
+#[derive(Debug, Clone)]
+pub struct UserClaims {
+    pub claims: Claims,
+    pub raw_token: String,
+}
+
+fn extract_bearer_token(req: &Request) -> Option<String> {
+    req.headers()
+        .get(AUTHORIZATION)
+        .and_then(|header| header.to_str().ok())
+        .and_then(|auth_str| auth_str.strip_prefix("Bearer "))
+        .map(|token| token.to_string())
+}
+
 pub async fn optional_auth_middleware(
+    State(app_state): State<AppState>,
     mut req: Request,
     next: Next,
 ) -> Response {
-    // 获取配置
-    if let Ok(config) = Config::from_env() {
-        let auth_header = req
-            .headers()
-            .get(AUTHORIZATION)
-            .and_then(|header| header.to_str().ok());
-
-        if let Some(auth_header) = auth_header {
-            if let Some(token) = auth_header.strip_prefix("Bearer ") {
-                if let Ok(claims) = AuthService::verify_token(token, &config).await {
-                    // Add user info to request extensions if token is valid
-                    req.extensions_mut().insert(claims);
-                }
+    if let Some(token) = extract_bearer_token(&req) {
+        match AuthService::verify_token(&token, &app_state.config).await {
+            Ok(claims) => {
+                req.extensions_mut().insert(UserClaims {
+                    claims,
+                    raw_token: token,
+                });
+            }
+            Err(_) => {
+                return ApiError::Unauthorized("无效的 Token".to_string()).into_response();
             }
         }
     }
