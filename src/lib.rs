@@ -6,11 +6,14 @@ pub mod logging;
 pub mod middleware;
 pub mod schemas;
 pub mod services;
+use anyhow::Result;
+use std::sync::Arc;
 
-use crate::config::AppState;
+use crate::config::Config;
 use crate::handlers::{auth, servers};
 use crate::middleware::{auth::optional_auth_middleware, simple_http_logging_middleware};
 use crate::services::auth::SecurityAddon;
+use crate::services::database::{establish_connection, DatabaseConnection};
 use axum::routing::post;
 use axum::{
     middleware as axum_middleware,
@@ -61,6 +64,29 @@ use utoipa_swagger_ui::SwaggerUi;
     tags((name = "servers", description = "Server management endpoints"))
 )]
 pub struct ApiDoc;
+
+#[derive(Clone)]
+pub struct AppState {
+    pub config: Arc<Config>,
+    pub db: DatabaseConnection,
+}
+
+impl AppState {
+    pub async fn new() -> Result<Self> {
+        let config = Arc::new(Config::from_env()?);
+        let db = match establish_connection(&config.database).await {
+            Ok(db) => {
+                tracing::info!("✅ 数据库初始化成功");
+                db
+            }
+            Err(e) => {
+                tracing::error!("❌ 数据库初始化失败: {}", e);
+                return Err(e.into());
+            }
+        };
+        Ok(Self { config, db })
+    }
+}
 
 pub fn create_app(app_state: AppState) -> Router {
     let server_router = Router::new()

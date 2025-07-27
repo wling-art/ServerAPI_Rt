@@ -4,11 +4,10 @@ use serde::Deserialize;
 use tokio::task;
 
 use crate::{
-    config::AppState,
     entities::user,
     errors::{ApiError, ApiErrorResponse, ApiResult},
     schemas::auth::AuthToken,
-    services::auth::{AuthService, JwtData},
+    services::auth::{AuthService, JwtData}, AppState,
 };
 use bcrypt::verify;
 

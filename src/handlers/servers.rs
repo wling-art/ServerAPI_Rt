@@ -1,11 +1,10 @@
 use crate::{
-    config::AppState,
     errors::{ApiError, ApiErrorResponse, ApiResult},
     schemas::servers::{
         GalleryImageRequest, GalleryImageSchema, ServerDetail, ServerGallery, ServerListResponse,
         ServerManagersResponse, ServerTotalPlayers, SuccessResponse, UpdateServerRequest,
     },
-    services::{auth::Claims, server::ServerService},
+    services::{auth::Claims, server::ServerService}, AppState,
 };
 use axum::{
     extract::{Extension, Path, Query, State},
