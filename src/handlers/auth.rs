@@ -63,8 +63,6 @@ pub async fn login(
     State(app_state): State<AppState>,
     Json(user_data): Json<UserLoginData>,
 ) -> ApiResult<Json<AuthToken>> {
-    use std::time::Instant;
-
     if user_data.username_or_email.is_empty() || user_data.password.is_empty() {
         return Err(ApiError::BadRequest("用户名或密码不能为空".to_string()));
     }
