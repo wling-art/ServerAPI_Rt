@@ -35,7 +35,8 @@ use utoipa_swagger_ui::SwaggerUi;
         servers::upload_gallery_image,
         servers::delete_gallery_image,
         servers::get_total_players,
-        auth::login
+        auth::login,
+        auth::logout
     ),
     components(
         schemas(
