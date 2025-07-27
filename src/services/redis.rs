@@ -16,9 +16,9 @@ static REDIS_INSTANCE: OnceCell<Arc<RedisService>> = OnceCell::const_new();
 
 impl RedisService {
     /// 初始化 Redis 连接
-    pub async fn init(config: &RedisConfig) -> Result<()> {
+    pub async fn init(config: RedisConfig) -> Result<()> {
         let redis_url = format!("redis://{}:{}", config.host, config.port);
-        tracing::info!("🔗 Connecting to Redis: {}:{}", config.host, config.port);
+        tracing::info!("🔗 连接到 Redis: {}:{}", config.host, config.port);
 
         let client = Client::open(redis_url)?;
         let manager = ConnectionManager::new(client).await?;
@@ -27,11 +27,11 @@ impl RedisService {
 
         // 测试连接
         service.ping().await?;
-        tracing::info!("✅ Redis connection established");
+        tracing::info!("✅ Redis 连接成功");
 
         REDIS_INSTANCE
             .set(service)
-            .map_err(|_| anyhow::anyhow!("Failed to initialize Redis instance"))?;
+            .map_err(|_| anyhow::anyhow!("初始化 Redis 实例失败"))?;
 
         Ok(())
     }
@@ -47,7 +47,7 @@ impl RedisService {
         let result: RedisResult<String> = redis::cmd("PING").query_async(&mut conn).await;
         match result {
             Ok(_) => Ok(()),
-            Err(e) => Err(anyhow::anyhow!("Redis ping failed: {}", e)),
+            Err(e) => Err(anyhow::anyhow!("Redis ping 失败: {}", e)),
         }
     }
 
@@ -61,7 +61,7 @@ impl RedisService {
             .query_async(&mut conn)
             .await;
 
-        result.map_err(|e| anyhow::anyhow!("Redis SETEX failed: {}", e))
+        result.map_err(|e| anyhow::anyhow!("Redis SETEX 失败: {}", e))
     }
 
     /// 检查键是否存在
@@ -69,7 +69,7 @@ impl RedisService {
         let mut conn = self.manager.clone();
         let result: RedisResult<bool> = redis::cmd("EXISTS").arg(key).query_async(&mut conn).await;
 
-        result.map_err(|e| anyhow::anyhow!("Redis EXISTS failed: {}", e))
+        result.map_err(|e| anyhow::anyhow!("Redis EXISTS 失败: {}", e))
     }
 
     /// 删除键
@@ -77,7 +77,7 @@ impl RedisService {
         let mut conn = self.manager.clone();
         let result: RedisResult<()> = redis::cmd("DEL").arg(key).query_async(&mut conn).await;
 
-        result.map_err(|e| anyhow::anyhow!("Redis DEL failed: {}", e))
+        result.map_err(|e| anyhow::anyhow!("Redis DEL 失败: {}", e))
     }
 
     /// 获取键的剩余过期时间（秒）
@@ -85,7 +85,7 @@ impl RedisService {
         let mut conn = self.manager.clone();
         let result: RedisResult<i64> = redis::cmd("TTL").arg(key).query_async(&mut conn).await;
 
-        result.map_err(|e| anyhow::anyhow!("Redis TTL failed: {}", e))
+        result.map_err(|e| anyhow::anyhow!("Redis TTL 失败: {}", e))
     }
 
     /// 批量删除匹配模式的键
@@ -108,9 +108,9 @@ impl RedisService {
                 }
 
                 let deleted: RedisResult<u64> = cmd.query_async(&mut conn).await;
-                deleted.map_err(|e| anyhow::anyhow!("Redis DEL pattern failed: {}", e))
+                deleted.map_err(|e| anyhow::anyhow!("Redis DEL 匹配失败: {}", e))
             }
-            Err(e) => Err(anyhow::anyhow!("Redis KEYS failed: {}", e)),
+            Err(e) => Err(anyhow::anyhow!("Redis KEYS 失败: {}", e)),
         }
     }
 }

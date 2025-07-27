@@ -1,18 +1,17 @@
 use axum::{
-    extract::{Request, State},
+    extract::{Request},
     http::header::AUTHORIZATION,
     middleware::Next,
     response::Response,
 };
 
 use crate::{
-    config::Config,
-    services::{auth::AuthService, database::DatabaseConnection},
+    config::{Config},
+    services::{auth::AuthService},
 };
 
 /// Optional authentication middleware - extracts user info if present but doesn't require it
 pub async fn optional_auth_middleware(
-    State(_db): State<DatabaseConnection>,
     mut req: Request,
     next: Next,
 ) -> Response {

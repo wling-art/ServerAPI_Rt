@@ -1,61 +1,46 @@
 use axum::{extract::State, http::HeaderMap, Json};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use serde::Deserialize;
+use tokio::task;
 
 use crate::{
-    config::Config,
+    config::AppState,
     entities::user,
     errors::{ApiError, ApiErrorResponse, ApiResult},
     schemas::auth::AuthToken,
-    services::{
-        auth::{AuthService, JwtData},
-        database::DatabaseConnection,
-    },
+    services::auth::{AuthService, JwtData},
 };
 use bcrypt::verify;
 
 #[derive(Deserialize, utoipa::IntoParams, utoipa::ToSchema)]
 pub struct UserLoginData {
-    /// 用户名或邮箱
     username_or_email: String,
-    /// 密码
     password: String,
 }
 
 fn get_ip(headers: &HeaderMap) -> Option<String> {
-    if let Some(forwarded) = headers.get("x-forwarded-for") {
-        if let Ok(forwarded_str) = forwarded.to_str() {
-            if let Some(first_ip) = forwarded_str.split(',').next() {
-                let ip = first_ip.trim();
-                if !ip.is_empty() {
-                    return Some(ip.to_string());
-                }
-            }
-        }
-    }
-
-    // 其次从 X-Real-IP 获取
-    if let Some(real_ip) = headers.get("x-real-ip") {
-        if let Ok(ip_str) = real_ip.to_str() {
-            if !ip_str.is_empty() {
-                return Some(ip_str.to_string());
-            }
-        }
-    }
-
-    // 从 X-Forwarded-Host 获取
-    if let Some(forwarded_host) = headers.get("x-forwarded-host") {
-        if let Ok(host_str) = forwarded_host.to_str() {
-            if !host_str.is_empty() {
-                return Some(host_str.to_string());
-            }
-        }
-    }
-
-    None
+    headers
+        .get("x-forwarded-for")
+        .and_then(|h| h.to_str().ok())
+        .and_then(|s| s.split(',').next())
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .or_else(|| {
+            headers
+                .get("x-real-ip")
+                .and_then(|h| h.to_str().ok())
+                .map(|s| s.to_string())
+                .filter(|s| !s.is_empty())
+        })
+        .or_else(|| {
+            headers
+                .get("x-forwarded-host")
+                .and_then(|h| h.to_str().ok())
+                .map(|s| s.to_string())
+                .filter(|s| !s.is_empty())
+        })
 }
 
-/// 用户登陆，返回 JWT token
 #[utoipa::path(
     post,
     path = "/v2/auth/login",
@@ -75,37 +60,62 @@ fn get_ip(headers: &HeaderMap) -> Option<String> {
 )]
 pub async fn login(
     headers: HeaderMap,
-    State(db): State<DatabaseConnection>,
+    State(app_state): State<AppState>,
     Json(user_data): Json<UserLoginData>,
 ) -> ApiResult<Json<AuthToken>> {
-    // 开始校验
+    use std::time::Instant;
+
     if user_data.username_or_email.is_empty() || user_data.password.is_empty() {
         return Err(ApiError::BadRequest("用户名或密码不能为空".to_string()));
-    };
+    }
 
-    let user = if user_data.username_or_email.contains('@') {
-        user::Entity::find()
-            .filter(user::Column::Email.eq(user_data.username_or_email.clone()))
-            .one(&*db)
-            .await?
-            .ok_or(ApiError::Unauthorized("用户不存在".to_string()))?
-    } else {
-        user::Entity::find()
-            .filter(user::Column::Username.eq(user_data.username_or_email.clone()))
-            .one(&*db)
-            .await?
-            .ok_or(ApiError::Unauthorized("用户不存在".to_string()))?
-    };
-    let config = Config::from_env()?;
+    let config = &app_state.config;
+    let db = &app_state.db;
 
-    match verify(&user_data.password, &user.hashed_password) {
+    let (user_result, client_ip) = tokio::join!(
+        async {
+            if user_data.username_or_email.contains('@') {
+                user::Entity::find()
+                    .filter(user::Column::Email.eq(&user_data.username_or_email))
+                    .one(db.as_ref())
+                    .await
+            } else {
+                user::Entity::find()
+                    .filter(user::Column::Username.eq(&user_data.username_or_email))
+                    .one(db.as_ref())
+                    .await
+            }
+        },
+        async { get_ip(&headers) }
+    );
+
+    let user = user_result?.ok_or(ApiError::Unauthorized("用户不存在".to_string()))?;
+
+    let password = user_data.password;
+    let hashed_password = user.hashed_password.clone();
+    let user_id = user.id;
+    let username = user.username.clone();
+
+    let verify_result = task::spawn_blocking(move || verify(&password, &hashed_password)) // 煞笔 bcrypt 真他妈慢
+        .await
+        .map_err(|_| ApiError::InternalServerError("密码校验任务失败".to_string()))?;
+
+    match verify_result {
         Ok(true) => {
-            AuthService::update_last_login(&db, user.id, get_ip(&headers)).await?;
             let jwt_data = JwtData {
-                user_id: user.id,
-                username: user.username,
+                user_id,
+                username: username.clone(),
             };
-            let token = AuthService::create_access_token(&jwt_data, &config)?;
+            let token = AuthService::create_access_token(&jwt_data, config)?;
+
+            let db_clone = db.clone();
+            tokio::spawn(async move {
+                if let Err(e) = AuthService::update_last_login(&db_clone, user_id, client_ip).await
+                {
+                    eprintln!("更新最后登录时间失败: {:?}", e);
+                }
+            });
+
             Ok(Json(AuthToken {
                 access_token: token,
                 expires_in: config.jwt.expiration,

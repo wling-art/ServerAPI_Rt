@@ -7,10 +7,10 @@ pub mod middleware;
 pub mod schemas;
 pub mod services;
 
+use crate::config::AppState;
 use crate::handlers::{auth, servers};
 use crate::middleware::{auth::optional_auth_middleware, simple_http_logging_middleware};
 use crate::services::auth::SecurityAddon;
-use crate::services::database::DatabaseConnection;
 use axum::routing::post;
 use axum::{
     middleware as axum_middleware,
@@ -62,7 +62,7 @@ use utoipa_swagger_ui::SwaggerUi;
 )]
 pub struct ApiDoc;
 
-pub fn create_app(db: DatabaseConnection) -> Router {
+pub fn create_app(app_state: AppState) -> Router {
     let server_router = Router::new()
         // Server routes with optional authentication
         .route("/", get(servers::list_servers))
@@ -93,9 +93,6 @@ pub fn create_app(db: DatabaseConnection) -> Router {
         .layer(CorsLayer::permissive())
         // Add HTTP logging middleware
         .layer(axum_middleware::from_fn(simple_http_logging_middleware))
-        .layer(axum_middleware::from_fn_with_state(
-            db.clone(),
-            optional_auth_middleware,
-        ))
-        .with_state(db)
+        .layer(axum_middleware::from_fn(optional_auth_middleware))
+        .with_state(app_state)
 }

@@ -1,7 +1,10 @@
 use anyhow::Result;
 use serde::Deserialize;
+use std::sync::Arc;
 
-#[derive(Debug, Deserialize)]
+use crate::services::database::{establish_connection, DatabaseConnection};
+
+#[derive(Debug, Deserialize, Clone)]
 pub struct Config {
     pub database: DatabaseConfig,
     pub server: ServerConfig,
@@ -10,7 +13,7 @@ pub struct Config {
     pub s3: S3Config,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct DatabaseConfig {
     pub url: String,
     pub min_connections: u32,
@@ -20,30 +23,53 @@ pub struct DatabaseConfig {
     pub idle_timeout: u64,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct ServerConfig {
     pub host: String,
     pub port: u16,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct JwtConfig {
     pub secret: String,
     pub expiration: u64,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct RedisConfig {
     pub host: String,
     pub port: u16,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct S3Config {
     pub endpoint_url: String,
     pub access_key: String,
     pub secret_key: String,
     pub bucket: String,
+}
+
+#[derive(Clone)]
+pub struct AppState {
+    pub config: Arc<Config>,
+    pub db: DatabaseConnection,
+}
+
+impl AppState {
+    pub async fn new() -> Result<Self> {
+        let config = Arc::new(Config::from_env()?);
+        let db = match establish_connection(&config.database).await {
+            Ok(db) => {
+                tracing::info!("✅ 数据库初始化成功");
+                db
+            }
+            Err(e) => {
+                tracing::error!("❌ 数据库初始化失败: {}", e);
+                return Err(e.into());
+            }
+        };
+        Ok(Self { config, db })
+    }
 }
 
 impl Config {

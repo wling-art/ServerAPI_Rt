@@ -1,4 +1,5 @@
 use colored::*;
+use console::measure_text_width;
 use std::fmt;
 use tracing::Level;
 use tracing_subscriber::{
@@ -8,10 +9,9 @@ use tracing_subscriber::{
     EnvFilter,
 };
 
-/// 自定义格式化器，类似于 Gin 框架的日志格式
-pub struct GinLikeFormatter;
+pub struct CleanFormatter;
 
-impl<S, N> FormatEvent<S, N> for GinLikeFormatter
+impl<S, N> FormatEvent<S, N> for CleanFormatter
 where
     S: tracing::Subscriber + for<'a> tracing_subscriber::registry::LookupSpan<'a>,
     N: for<'a> FormatFields<'a> + 'static,
@@ -22,44 +22,47 @@ where
         mut writer: tracing_subscriber::fmt::format::Writer<'_>,
         event: &tracing::Event<'_>,
     ) -> fmt::Result {
-        // 本地时区
         let now = chrono::Local::now();
-        let timestamp = now.format("%Y-%m-%d %H:%M:%S").to_string();
+        let timestamp = now.format("%H:%M:%S").to_string();
 
-        // 获取日志级别
         let level = *event.metadata().level();
         let level_str = format_level(&level);
 
-        // 获取模块路径
         let target = event.metadata().target();
-        let module = if target.starts_with("server_api_rt") {
-            target.strip_prefix("server_api_rt::").unwrap_or(target)
-        } else {
-            target
-        };
+        let module = extract_module_name(target);
 
-        // 格式化输出类似于 Gin: [GIN] 2023/12/25 - 15:30:45 | 200 | 123.456ms | 192.168.1.1 | GET /api/users
+        // 计算各字段的实际显示宽度
+        let timestamp_width = measure_text_width(&timestamp);
+        let level_width = measure_text_width(&level_str.to_string());
+        let module_width = measure_text_width(&module);
+
+        // 固定宽度设置
+        const TIMESTAMP_WIDTH: usize = 8; // HH:MM:SS
+        const LEVEL_WIDTH: usize = 5; // ERROR, WARN , etc.
+        const MODULE_WIDTH: usize = 5; // 可根据需要调整
+
+        // 计算需要的填充空格
+        let timestamp_padding = TIMESTAMP_WIDTH.saturating_sub(timestamp_width);
+        let level_padding = LEVEL_WIDTH.saturating_sub(level_width);
+        let module_padding = MODULE_WIDTH.saturating_sub(module_width);
+
         write!(
             writer,
-            "{} {} {} {} ",
-            "[SERVER]".bright_cyan().bold(),
+            "{}{} {}{} {}{} {} ",
             timestamp.bright_black(),
-            "|".bright_black(),
-            level_str
+            " ".repeat(timestamp_padding),
+            level_str,
+            " ".repeat(level_padding),
+            module.bright_blue(),
+            " ".repeat(module_padding),
+            "│".bright_black()
         )?;
 
-        if !module.is_empty() && module != "server_api_rt" {
-            write!(writer, "{} {} ", "|".bright_black(), module.bright_black())?;
-        }
-
-        // 格式化事件消息
         ctx.field_format().format_fields(writer.by_ref(), event)?;
-
         writeln!(writer)
     }
 }
 
-/// HTTP 请求日志格式化器
 pub struct HttpLogFormatter;
 
 impl HttpLogFormatter {
@@ -70,84 +73,110 @@ impl HttpLogFormatter {
         duration: std::time::Duration,
         remote_addr: Option<&str>,
     ) -> String {
-        let method_colored = match method {
-            "GET" => method.bright_green().bold(),
-            "POST" => method.bright_blue().bold(),
-            "PUT" => method.bright_yellow().bold(),
-            "DELETE" => method.bright_red().bold(),
-            "PATCH" => method.bright_magenta().bold(),
-            _ => method.bright_white().bold(),
-        };
-
-        let status_colored = match status {
-            200..=299 => status.to_string().bright_green().bold(),
-            300..=399 => status.to_string().bright_yellow().bold(),
-            400..=499 => status.to_string().bright_red().bold(),
-            500..=599 => status.to_string().on_bright_red().bright_white().bold(),
-            _ => status.to_string().bright_white().bold(),
-        };
-
-        let duration_ms = duration.as_secs_f64() * 1000.0;
-        let duration_colored = if duration_ms < 100.0 {
-            format!("{:.2}ms", duration_ms).bright_green()
-        } else if duration_ms < 500.0 {
-            format!("{:.2}ms", duration_ms).bright_yellow()
-        } else {
-            format!("{:.2}ms", duration_ms).bright_red()
-        };
-
-        let remote_display = match remote_addr {
-            Some(addr) => format!("from {}", addr.bright_blue()),
-            None => "".to_string(),
-        };
+        let method_colored = format_method(method);
+        let status_colored = format_status(status);
+        let duration_colored = format_duration(duration);
+        let remote_info = format_remote_addr(remote_addr);
 
         format!(
-            "{} {} {} {} {} {} {}",
-            "[HTTP]".bright_cyan().bold(),
-            "|".bright_black(),
+            "{} {} {} {} {}",
             status_colored,
-            "|".bright_black(),
             duration_colored,
-            "|".bright_black(),
-            format!(
-                "{} {} {}",
-                method_colored,
-                uri.bright_white(),
-                remote_display
-            )
+            method_colored,
+            uri.bright_white(),
+            remote_info
         )
     }
 }
 
 fn format_level(level: &Level) -> ColoredString {
     match *level {
-        Level::ERROR => "ERROR".bright_red().bold(),
-        Level::WARN => "WARN ".bright_yellow().bold(),
-        Level::INFO => "INFO ".bright_green().bold(),
-        Level::DEBUG => "DEBUG".bright_blue().bold(),
-        Level::TRACE => "TRACE".bright_magenta().bold(),
+        Level::ERROR => "ERROR".bright_red(),
+        Level::WARN => "WARN ".bright_yellow(),
+        Level::INFO => "INFO ".bright_green(),
+        Level::DEBUG => "DEBUG".bright_blue(),
+        Level::TRACE => "TRACE".bright_magenta(),
     }
 }
 
-/// 初始化日志系统
+fn extract_module_name(target: &str) -> String {
+    let module = if target.starts_with("server_api_rt") {
+        let stripped = target.strip_prefix("server_api_rt::").unwrap_or(target);
+        if stripped == "server_api_rt" {
+            "main"
+        } else {
+            stripped.split("::").last().unwrap_or("app")
+        }
+    } else {
+        target.split("::").last().unwrap_or(target)
+    };
+
+    // 限制模块名最大长度
+    const MAX_MODULE_LEN: usize = 8;
+    if module.len() > MAX_MODULE_LEN {
+        format!("{:.len$}", module, len = MAX_MODULE_LEN - 2) + ".."
+    } else {
+        format!("{:<len$}", module, len = MAX_MODULE_LEN)
+    }
+}
+
+fn format_method(method: &str) -> ColoredString {
+    let padded = format!("{:<6}", method);
+    match method {
+        "GET" => padded.bright_green(),
+        "POST" => padded.bright_blue(),
+        "PUT" => padded.bright_yellow(),
+        "DELETE" => padded.bright_red(),
+        "PATCH" => padded.bright_magenta(),
+        _ => padded.bright_white(),
+    }
+}
+
+fn format_status(status: u16) -> ColoredString {
+    match status {
+        200..=299 => status.to_string().bright_green(),
+        300..=399 => status.to_string().bright_yellow(),
+        400..=499 => status.to_string().bright_red(),
+        500..=599 => status.to_string().on_red().bright_white(),
+        _ => status.to_string().bright_white(),
+    }
+}
+
+fn format_duration(duration: std::time::Duration) -> ColoredString {
+    let duration_ms = duration.as_secs_f64() * 1000.0;
+    let duration_str = format!("{:>7.1}ms", duration_ms);
+
+    if duration_ms < 100.0 {
+        duration_str.bright_green()
+    } else if duration_ms < 500.0 {
+        duration_str.bright_yellow()
+    } else {
+        duration_str.bright_red()
+    }
+}
+
+fn format_remote_addr(remote_addr: Option<&str>) -> ColoredString {
+    match remote_addr {
+        Some(addr) => format!("from {}", addr).bright_black(),
+        None => "".normal(),
+    }
+}
+
 pub fn init_logging() -> anyhow::Result<()> {
-    // 配置日志过滤器，隐藏不必要的详细日志
     let env_filter = EnvFilter::try_from_default_env().or_else(|_| {
         EnvFilter::try_new(
             "info,sqlx=warn,sqlx::query=off,sea_orm=warn,sea_orm_migration=warn,hyper=warn,tower=warn,tower_http=warn,axum=warn,h2=warn,mio=warn,want=warn,tokio_util=warn"
         )
     })?;
 
-    // 检查是否为 TTY（终端），如果是则启用彩色输出
     let use_colors = atty::is(atty::Stream::Stdout);
 
     if use_colors {
-        // 着色
         tracing_subscriber::registry()
             .with(env_filter)
             .with(
                 tracing_subscriber::fmt::layer()
-                    .event_format(GinLikeFormatter)
+                    .event_format(CleanFormatter)
                     .with_ansi(true),
             )
             .init();
@@ -161,57 +190,41 @@ pub fn init_logging() -> anyhow::Result<()> {
     Ok(())
 }
 
-/// 应用启动日志
 pub fn log_startup_info(config: &crate::config::Config) {
     println!();
-    println!("{}", "🚀 Server API Starting...".bright_cyan().bold());
-    println!(
-        "{}",
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".bright_black()
-    );
+    println!("{}", "─".repeat(60).bright_cyan());
+    println!("{}", "  🚀 Server API 启动中...".bright_cyan().bold());
+    println!("{}", "─".repeat(60).bright_cyan());
 
-    tracing::info!("🔧 Configuration loaded successfully");
-    tracing::info!("🗄️  Database: {}", mask_database_url(&config.database.url));
-    tracing::info!("🌐 Server: {}:{}", config.server.host, config.server.port);
-    tracing::info!("� Redis: {}:{}", config.redis.host, config.redis.port);
-    tracing::info!("�🔐 JWT: Configured");
-
-    println!(
-        "{}",
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".bright_black()
-    );
+    tracing::info!("配置加载成功");
+    tracing::info!("数据库: {}", mask_database_url(&config.database.url));
+    tracing::info!("服务器: {}:{}", config.server.host, config.server.port);
+    tracing::info!("Redis: {}:{}", config.redis.host, config.redis.port);
+    tracing::info!("JWT: 已配置");
 }
 
-/// 服务器启动完成日志
 pub fn log_server_ready(addr: &std::net::SocketAddr) {
-    println!();
-    println!("{}", "✅ Server is ready!".bright_green().bold());
+    println!("{}", "─".repeat(60).bright_green());
+    println!("{}", "  ✅ 服务器启动完成".bright_green().bold());
+    println!("{}", "─".repeat(60).bright_green());
     println!(
-        "{}",
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".bright_black()
-    );
-    println!(
-        "🏠 Server:      {}",
+        "  🌐 服务地址: {}",
         format!("http://{}", addr).bright_white().underline()
     );
     println!(
-        "❤️  Health:     {}",
-        format!("http://{}/health", addr).bright_white().underline()
+        "  ❤️  健康检查: {}",
+        format!("http://{}/health", addr).bright_green().underline()
     );
     println!(
-        "📖 API Docs:    {}",
-        format!("http://{}/docs", addr).bright_white().underline()
+        "  📚 API 文档: {}",
+        format!("http://{}/docs", addr).bright_blue().underline()
     );
-    println!(
-        "{}",
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".bright_black()
-    );
+    println!("{}", "─".repeat(60).bright_green());
     println!();
 
-    tracing::info!("🎉 Server listening on {}", addr);
+    tracing::info!("服务器监听地址: {}", addr);
 }
 
-/// 屏蔽数据库 URL 中的敏感信息
 fn mask_database_url(url: &str) -> String {
     if let Ok(parsed) = url::Url::parse(url) {
         let mut masked = parsed.clone();
@@ -220,18 +233,18 @@ fn mask_database_url(url: &str) -> String {
         }
         masked.to_string()
     } else {
-        "***masked***".to_string()
+        "***已屏蔽***".to_string()
     }
 }
 
-/// 应用关闭日志
 pub fn log_shutdown() {
     println!();
-    println!("{}", "👋 Server shutting down...".bright_yellow().bold());
-    tracing::info!("Server shutdown completed");
+    println!("{}", "─".repeat(60).bright_yellow());
+    println!("{}", "  👋 服务器关闭中...".bright_yellow().bold());
+    println!("{}", "─".repeat(60).bright_yellow());
+    tracing::info!("服务器关闭完成");
 }
 
-// 宏定义，用于简化 HTTP 日志记录
 #[macro_export]
 macro_rules! log_http_request {
     ($method:expr, $uri:expr, $status:expr, $duration:expr) => {

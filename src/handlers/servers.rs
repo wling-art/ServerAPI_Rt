@@ -1,10 +1,11 @@
 use crate::{
+    config::AppState,
     errors::{ApiError, ApiErrorResponse, ApiResult},
     schemas::servers::{
         GalleryImageRequest, GalleryImageSchema, ServerDetail, ServerGallery, ServerListResponse,
         ServerManagersResponse, ServerTotalPlayers, SuccessResponse, UpdateServerRequest,
     },
-    services::{auth::Claims, database::DatabaseConnection, server::ServerService},
+    services::{auth::Claims, server::ServerService},
 };
 use axum::{
     extract::{Extension, Path, Query, State},
@@ -91,7 +92,7 @@ pub struct ServerDetailQuery {
     )
 )]
 pub async fn list_servers(
-    State(db): State<DatabaseConnection>,
+    State(app_state): State<AppState>,
     Query(query): Query<ListQuery>,
     user_claims: Option<Extension<Claims>>,
 ) -> ApiResult<Json<ServerListResponse>> {
@@ -100,7 +101,7 @@ pub async fn list_servers(
             "page 与 page_size 不能小于 1".to_string(),
         ));
     }
-
+    let db = &app_state.db;
     let user_id = user_claims.map(|Extension(claims)| claims.id);
 
     let result = ServerService::get_servers_with_filters(&db, user_id, &query).await?;
@@ -150,7 +151,7 @@ pub async fn list_servers(
     )
 )]
 pub async fn get_server_detail(
-    State(db): State<DatabaseConnection>,
+    State(app_state): State<AppState>,
     Path(server_id): Path<i32>,
     Query(query): Query<ServerDetailQuery>,
     user_claims: Option<Extension<Claims>>,
@@ -158,6 +159,7 @@ pub async fn get_server_detail(
     let user_id = user_claims.map(|Extension(claims)| claims.id);
 
     let full_info = query.full_info.unwrap_or(false);
+    let db = &app_state.db;
 
     let result = ServerService::get_server_detail(&db, user_id, server_id, full_info).await?;
 
@@ -212,7 +214,7 @@ pub async fn get_server_detail(
     )
 )]
 pub async fn update_server(
-    State(db): State<DatabaseConnection>,
+    State(app_state): State<AppState>,
     Path(server_id): Path<i32>,
     user_claims: Option<Extension<Claims>>,
     TypedMultipart(update_data): TypedMultipart<UpdateServerRequest>,
@@ -231,6 +233,7 @@ pub async fn update_server(
         bucket: std::env::var("S3_BUCKET")
             .map_err(|_| ApiError::Internal("S3配置缺失".to_string()))?,
     };
+    let db = &app_state.db;
 
     // 调用服务层更新服务器
     let updated_server =
@@ -264,9 +267,10 @@ pub async fn update_server(
     params(("server_id" = i32, Path, description = "服务器 ID"))
 )]
 pub async fn get_server_managers(
-    State(db): State<DatabaseConnection>,
+    State(app_state): State<AppState>,
     Path(server_id): Path<i32>,
 ) -> ApiResult<Json<ServerManagersResponse>> {
+    let db = &app_state.db;
     let result = ServerService::get_server_managers(&db, server_id).await?;
     Ok(Json(result))
 }
@@ -297,9 +301,10 @@ pub async fn get_server_managers(
     params(("server_id" = i32, Path, description = "服务器ID"))
 )]
 pub async fn get_server_gallery(
-    State(db): State<DatabaseConnection>,
+    State(app_state): State<AppState>,
     Path(server_id): Path<i32>,
 ) -> ApiResult<Json<ServerGallery>> {
+    let db = &app_state.db;
     let result = ServerService::get_server_gallery(&db, server_id).await?;
     Ok(Json(result))
 }
@@ -367,7 +372,7 @@ pub async fn get_server_gallery(
     )
 )]
 pub async fn upload_gallery_image(
-    State(db): State<DatabaseConnection>,
+    State(app_state): State<AppState>,
     Path(server_id): Path<i32>,
     user_claims: Option<Extension<Claims>>,
     TypedMultipart(gallery_data): TypedMultipart<GalleryImageSchema>,
@@ -376,6 +381,7 @@ pub async fn upload_gallery_image(
     let claims = user_claims
         .ok_or_else(|| ApiError::Unauthorized("未授权".to_string()))?
         .0;
+    let db = &app_state.db;
 
     // 检查用户是否有这个服务器的编辑权
     let has_permission =
@@ -461,7 +467,7 @@ pub async fn upload_gallery_image(
     )
 )]
 pub async fn delete_gallery_image(
-    State(db): State<DatabaseConnection>,
+    State(app_state): State<AppState>,
     Path((server_id, image_id)): Path<(i32, i32)>,
     user_claims: Option<Extension<Claims>>,
 ) -> ApiResult<Json<serde_json::Value>> {
@@ -469,7 +475,7 @@ pub async fn delete_gallery_image(
     let claims = user_claims
         .ok_or_else(|| ApiError::Unauthorized("未授权".to_string()))?
         .0;
-
+    let db = &app_state.db;
     // 检查用户是否有这个服务器的编辑权
     let has_permission =
         ServerService::has_server_edit_permission(&db, claims.id, server_id).await?;
@@ -510,8 +516,9 @@ pub async fn delete_gallery_image(
     tag = "servers"
 )]
 pub async fn get_total_players(
-    State(db): State<DatabaseConnection>,
+    State(app_state): State<AppState>,
 ) -> ApiResult<Json<ServerTotalPlayers>> {
+    let db = &app_state.db;
     let result = ServerService::total_players(&db).await?;
     Ok(Json(result))
 }
