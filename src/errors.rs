@@ -12,8 +12,10 @@ use utoipa::ToSchema;
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct ApiErrorResponse {
     /// 错误信息
+    #[schema(example = "找不到！什么都没有，一片空气")]
     pub error: String,
     /// HTTP 状态码
+    #[schema(example = 404)]
     pub status: u16,
 }
 

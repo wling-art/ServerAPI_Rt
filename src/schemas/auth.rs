@@ -1,6 +1,8 @@
+use once_cell::sync::Lazy;
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
-
+use validator::Validate;
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct AuthToken {
     /// JWT 访问令牌
@@ -12,3 +14,52 @@ pub struct AuthToken {
     #[schema(example = 2592000)]
     pub expires_in: u64,
 }
+
+/// 用户登录请求数据结构体
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct UserLoginData {
+    /// 用户名或邮箱（识别是否包含 @ 判断是否有邮箱）
+    #[schema(example = "user123")]
+    #[schema(example = "user@example.com")]
+    pub username_or_email: String,
+    /// 密码
+    #[schema(example = "Password123")]
+    pub password: String,
+}
+
+#[derive(Debug, Clone, Serialize, Validate, Deserialize, ToSchema)]
+pub struct UserRegisterData {
+    /// 邮箱
+    #[validate(email(message = "邮箱格式不正确"))]
+    #[schema(example = "user@example.com")]
+    pub email: String,
+
+    /// 密码(长度在 8 到 32 个字符之间，必须包含字母和数字)
+    #[validate(length(min = 8, max = 32, message = "密码长度必须在 8 到 32 个字符之间"))]
+    #[validate(regex(
+        path = "*PASSWORD_REGEX",
+        message = "密码格式不正确，必须包含字母和数字"
+    ))]
+    #[schema(example = "Password123")]
+    pub password: String,
+
+    /// 用户名(长度在 3 到 20 个字符之间，只能包含字母、数字和下划线)
+    #[validate(length(min = 3, max = 20, message = "用户名长度必须在 3 到 20 个字符之间"))]
+    #[validate(regex(path = "*USERNAME_REGEX", message = "用户名只能包含字母、数字和下划线"))]
+    #[schema(example = "user123")]
+    pub username: String,
+}
+
+// register by email
+#[derive(Debug, Clone, Serialize, Validate, Deserialize, ToSchema)]
+pub struct UserRegisterByEmailData {
+    /// 邮箱
+    #[validate(email(message = "邮箱格式不正确"))]
+    #[schema(example = "user@example.com")]
+    pub email: String,
+}
+
+pub static PASSWORD_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]+$").unwrap());
+
+pub static USERNAME_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"^[a-zA-Z0-9_]+$").unwrap());

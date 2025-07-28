@@ -1,9 +1,15 @@
 use crate::config::Config;
-use crate::entities::user;
+use crate::entities::users;
+use crate::services::email::sender::{build_email_message, build_smtp_transport};
+use crate::services::email::template::build_email_template;
 use crate::services::redis::RedisService;
-use anyhow::Result;
+use crate::services::utils::generate_verification_code;
+use anyhow::{Context, Result};
+use askama::Template;
 use chrono::{Duration, Utc};
 use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
+use lettre::Transport;
+
 use sea_orm::{ActiveModelTrait, DatabaseConnection};
 use serde::{Deserialize, Serialize};
 use std::collections::hash_map::DefaultHasher;
@@ -154,7 +160,7 @@ impl AuthService {
         user_id: i32,
         ip: Option<String>,
     ) -> Result<()> {
-        let user = user::ActiveModel {
+        let user = users::ActiveModel {
             id: sea_orm::Set(user_id),
             last_login: sea_orm::Set(Some(Utc::now())),
             last_login_ip: sea_orm::Set(ip),
@@ -165,6 +171,61 @@ impl AuthService {
             error!("更新最后登录信息失败: {}", e);
             e.into()
         })
+    }
+
+    /// 发送邮件验证码
+    pub async fn send_email_code(email: &str, config: &Config) -> Result<()> {
+
+        let code = generate_verification_code();
+        let template = build_email_template(&code)
+            .await
+            .context("构建邮件模板失败")?;
+
+        let redis = Self::get_redis_service()?;
+
+        let email_body = template.render().context("渲染邮件模板失败")?;
+        let message = build_email_message(email, &config.email.from_email, email_body)
+            .context("构建邮件消息失败")?;
+
+        let smtp_transport = build_smtp_transport(config)?;
+
+        tokio::spawn(async move {
+            if let Err(e) = smtp_transport.send(&message) {
+                tracing::error!("发送邮件失败: {:?}", e);
+            }
+        });
+
+        Self::store_verification_code(&redis, email, &code)
+            .await
+            .context("存储验证码到Redis失败")?;
+
+        Ok(())
+    }
+
+    /// 存储验证码到Redis
+    async fn store_verification_code(redis: &RedisService, email: &str, code: &str) -> Result<()> {
+        let key = format!("email_code:{}", email);
+        redis
+            .set_ex(&key, code, 300)
+            .await
+            .context("存储验证码到Redis失败")
+    }
+
+    pub async fn verify_email_code(email: &str, input_code: &str) -> Result<bool> {
+        let redis = Self::get_redis_service()?;
+        let key = format!("email_code:{}", email);
+
+        match redis.get(&key).await {
+            Ok(stored_code) => {
+                let is_valid = stored_code.as_deref() == Some(input_code);
+                if is_valid {
+                    // 验证成功后删除验证码
+                    let _ = redis.del(&key).await;
+                }
+                Ok(is_valid)
+            }
+            Err(_) => Ok(false), // 验证码不存在或已过期
+        }
     }
 
     // ========== 私有辅助方法 ==========

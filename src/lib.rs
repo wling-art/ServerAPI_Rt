@@ -36,14 +36,15 @@ use utoipa_swagger_ui::SwaggerUi;
         servers::delete_gallery_image,
         servers::get_total_players,
         auth::login,
-        auth::logout
+        auth::logout,
+        auth::register_email_code
     ),
     components(
         schemas(
             schemas::servers::ServerListResponse,
             schemas::servers::ApiServerType,
             schemas::servers::ServerDetail,
-            schemas::servers::ServerStatus,
+            schemas::servers::ServerStats,
             schemas::servers::ApiAuthMode,
             schemas::servers::Motd,
             schemas::servers::UpdateServerRequest,
@@ -57,8 +58,8 @@ use utoipa_swagger_ui::SwaggerUi;
             schemas::auth::AuthToken,
             entities::server::AuthModeEnum,
             entities::server::ServerTypeEnum,
-            crate::errors::ApiErrorResponse,
-            crate::errors::ApiError
+            errors::ApiErrorResponse,
+            errors::ApiError
         )
     ),
     modifiers(&SecurityAddon),
@@ -109,7 +110,8 @@ pub fn create_app(app_state: AppState) -> Router {
         );
     let auth_router = Router::new()
         .route("/login", post(auth::login))
-        .route("/logout", post(auth::logout));
+        .route("/logout", post(auth::logout))
+        .route("/register/email-code", post(auth::register_email_code));
 
     Router::new()
         .nest("/v2/servers", server_router)

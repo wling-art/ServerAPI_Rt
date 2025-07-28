@@ -1,26 +1,21 @@
 use axum::{extract::State, http::HeaderMap, Extension, Json};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
-use serde::Deserialize;
 use tokio::task;
+use validator::Validate;
 
 use crate::{
-    entities::user,
+    entities::users,
     errors::{ApiError, ApiErrorResponse, ApiResult},
     middleware::UserClaims,
-    schemas::{auth::AuthToken, servers::SuccessResponse},
+    schemas::{
+        auth::{AuthToken, UserLoginData, UserRegisterByEmailData},
+        servers::SuccessResponse,
+    },
     services::auth::{AuthService, JwtData},
     AppState,
 };
+use anyhow::Context;
 use bcrypt::verify;
-
-/// 用户登录请求数据结构体
-#[derive(Deserialize, utoipa::IntoParams, utoipa::ToSchema)]
-pub struct UserLoginData {
-    /// 用户名或邮箱（识别是否包含 @ 判断是否有邮箱）
-    username_or_email: String,
-    /// 密码
-    password: String,
-}
 
 fn get_ip(headers: &HeaderMap) -> Option<String> {
     headers
@@ -73,13 +68,13 @@ pub async fn login(
     let (user_result, client_ip) = tokio::join!(
         async {
             if user_data.username_or_email.contains('@') {
-                user::Entity::find()
-                    .filter(user::Column::Email.eq(&user_data.username_or_email))
+                users::Entity::find()
+                    .filter(users::Column::Email.eq(&user_data.username_or_email))
                     .one(db.as_ref())
                     .await
             } else {
-                user::Entity::find()
-                    .filter(user::Column::Username.eq(&user_data.username_or_email))
+                users::Entity::find()
+                    .filter(users::Column::Username.eq(&user_data.username_or_email))
                     .one(db.as_ref())
                     .await
             }
@@ -97,6 +92,8 @@ pub async fn login(
     let verify_result = task::spawn_blocking(move || verify(&password, &hashed_password)) // 煞笔 bcrypt 真他妈慢
         .await
         .map_err(|_| ApiError::InternalServerError("密码校验任务失败".to_string()))?;
+
+    // TODO: 写一个 bcrypt 转 10 cost，不然 12 cost 太慢了
 
     match verify_result {
         Ok(true) => {
@@ -152,4 +149,49 @@ pub async fn logout(
     } else {
         Err(ApiError::Unauthorized("未登录或令牌无效".to_string()))
     }
+}
+
+/// 注册
+#[utoipa::path(
+    post,
+    path = "/v2/auth/register/email-code",
+    summary = "用户注册",
+    description = "使用用户名、邮箱和密码进行注册，成功后返回 JWT 访问令牌",
+    tag = "auth",
+    responses(
+        (status = 200, description = "注册成功", body = SuccessResponse),
+        (status = 400, description = "请求数据不合法", body = ApiErrorResponse),
+        (status = 400, description = "用户已存在", body = ApiErrorResponse),
+        (status = 500, description = "服务器错误", body = ApiErrorResponse)
+    )
+)]
+pub async fn register_email_code(
+    State(app_state): State<AppState>,
+    Json(user_data): Json<UserRegisterByEmailData>,
+) -> ApiResult<Json<SuccessResponse>> {
+    if user_data.email.is_empty() {
+        return Err(ApiError::BadRequest("邮箱不能为空".to_string()));
+    }
+    if user_data.validate().is_err() {
+        return Err(ApiError::BadRequest("请求数据不合法".to_string()));
+    }
+
+    let user_exists = users::Entity::find()
+        .filter(users::Column::Email.eq(&user_data.email))
+        .one(app_state.db.as_ref())
+        .await
+        .map(|user| user.is_some())
+        .context("检查用户是否存在失败")?;
+
+    if user_exists {
+        return Err(ApiError::BadRequest("用户已存在".to_string()));
+    }
+
+    AuthService::send_email_code(&user_data.email, &app_state.config)
+        .await
+        .map_err(|e| ApiError::InternalServerError(format!("发送验证码失败: {}", e)))?;
+
+    Ok(Json(SuccessResponse {
+        message: format!("验证码已发送到 {}", user_data.email),
+    }))
 }

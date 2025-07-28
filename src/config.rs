@@ -8,6 +8,7 @@ pub struct Config {
     pub jwt: JwtConfig,
     pub redis: RedisConfig,
     pub s3: S3Config,
+    pub email: EmailConfig,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -47,10 +48,19 @@ pub struct S3Config {
     pub bucket: String,
 }
 
+#[derive(Debug, Deserialize, Clone)]
+pub struct EmailConfig {
+    pub smtp_server: String,
+    pub smtp_port: u16,
+    pub smtp_username: String,
+    pub from_email: String,
+    pub smtp_password: String,
+}
+
+
 impl Config {
     pub fn from_env() -> Result<Self> {
         dotenvy::dotenv().ok();
-
         let database = DatabaseConfig {
             url: std::env::var("DATABASE_URL")?,
             min_connections: std::env::var("DB_MIN_CONNECTIONS")
@@ -105,12 +115,23 @@ impl Config {
             bucket: std::env::var("S3_BUCKET")?,
         };
 
+        let email = EmailConfig {
+            smtp_server: std::env::var("SMTP_SERVER")?,
+            smtp_port: std::env::var("SMTP_PORT")
+                .unwrap_or_else(|_| "465".to_string())
+                .parse()?,
+            smtp_username: std::env::var("SMTP_USERNAME")?,
+            from_email: std::env::var("FROM_EMAIL")?,
+            smtp_password: std::env::var("SMTP_PASSWORD")?,
+        };
+
         Ok(Config {
             database,
             server,
             jwt,
             redis,
             s3,
+            email,
         })
     }
 }

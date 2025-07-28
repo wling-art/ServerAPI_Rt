@@ -8,10 +8,7 @@ use std::time::Duration;
 use uuid::Uuid;
 
 use crate::{
-    config::S3Config,
-    entities::{file, FileEntity},
-    errors::{ApiError, ApiResult},
-    services::database::DatabaseConnection,
+    config::S3Config, entities::files, errors::{ApiError, ApiResult}, services::database::DatabaseConnection
 };
 
 pub struct FileUploadService;
@@ -116,14 +113,14 @@ impl FileUploadService {
         s3_config: &S3Config,
         file_content: Vec<u8>,
         file_name: &str,
-    ) -> ApiResult<(String, file::Model)> {
-        let file_hash = file::Model::generate_file_hash(&file_content);
+    ) -> ApiResult<(String, files::Model)> {
+        let file_hash = files::Model::generate_file_hash(&file_content);
         let extension = Self::get_file_extension(file_name);
         let s3_object_name = format!("uploads/{}{}", Uuid::new_v4(), extension);
 
         // 检查文件是否已存在
-        if let Some(existing_file) = FileEntity::find()
-            .filter(file::Column::HashValue.eq(&file_hash))
+        if let Some(existing_file) = files::Entity::find()
+            .filter(files::Column::HashValue.eq(&file_hash))
             .one(db.as_ref())
             .await
             .map_err(|e| ApiError::Database(e.to_string()))?
@@ -160,12 +157,12 @@ impl FileUploadService {
             "{}/{}/{}",
             s3_config.endpoint_url, s3_config.bucket, s3_object_name
         );
-        let file_object = file::ActiveModel {
+        let file_object = files::ActiveModel {
             hash_value: Set(file_hash),
             file_path: Set(file_path.clone()),
         };
 
-        let created_file = FileEntity::insert(file_object)
+        let created_file = files::Entity::insert(file_object)
             .exec_with_returning(db.as_ref())
             .await
             .map_err(|e| ApiError::Database(e.to_string()))?;
@@ -179,7 +176,7 @@ impl FileUploadService {
         s3_config: &S3Config,
         content: Vec<u8>,
         _filename: &str,
-    ) -> ApiResult<file::Model> {
+    ) -> ApiResult<files::Model> {
         // 验证图片
         Self::validate_image(&content)?;
 
@@ -199,7 +196,7 @@ impl FileUploadService {
         s3_config: &S3Config,
         content: Vec<u8>,
         _filename: &str,
-    ) -> ApiResult<file::Model> {
+    ) -> ApiResult<files::Model> {
         // 检查文件大小（5MB 限制）
         if content.len() > 5 * 1024 * 1024 {
             return Err(ApiError::BadRequest(

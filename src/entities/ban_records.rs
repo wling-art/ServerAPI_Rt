@@ -4,41 +4,28 @@ use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq, Serialize, Deserialize)]
-#[sea_orm(table_name = "server_log")]
+#[sea_orm(table_name = "ban_records")]
 pub struct Model {
     #[sea_orm(primary_key)]
     pub id: i32,
-    #[sea_orm(column_type = "custom(\"LONGTEXT\")")]
-    pub changed_fields: String,
-    pub created_at: DateTime,
-    pub server_id: i32,
-    pub user_id: Option<i32>,
+    pub ban_type: String,
+    #[sea_orm(column_type = "custom(\"LONGTEXT\")", nullable)]
+    pub reason: Option<String>,
+    pub started_at: DateTime,
+    pub ended_at: Option<DateTime>,
+    pub user_id: i32,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
     #[sea_orm(
-        belongs_to = "super::server::Entity",
-        from = "Column::ServerId",
-        to = "super::server::Column::Id",
-        on_update = "Restrict",
-        on_delete = "Cascade"
-    )]
-    Server,
-    #[sea_orm(
         belongs_to = "super::users::Entity",
         from = "Column::UserId",
         to = "super::users::Column::Id",
         on_update = "Restrict",
-        on_delete = "SetNull"
+        on_delete = "Cascade"
     )]
     Users,
-}
-
-impl Related<super::server::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::Server.def()
-    }
 }
 
 impl Related<super::users::Entity> for Entity {

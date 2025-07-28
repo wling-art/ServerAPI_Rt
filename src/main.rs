@@ -1,7 +1,7 @@
 use server_api_rt::{
     create_app,
     logging::{init_logging, log_server_ready, log_shutdown},
-    services::redis::RedisService,
+    services::{redis::RedisService, utils::{maintain_sentence_queue, preload_sentence_queue}},
     AppState,
 };
 use std::net::SocketAddr;
@@ -20,7 +20,12 @@ async fn main() -> anyhow::Result<()> {
         tracing::error!("❌ Redis 连接失败: {}", e);
         return Err(e);
     }
+    tracing::info!("🔗 预热一句话接口");
+    // 预加载句子队列
+    preload_sentence_queue().await;
 
+    // 启动后台维护任务
+    maintain_sentence_queue().await;
     tracing::info!("🔧 创建应用程序...");
     let app = create_app(app_state.clone());
 

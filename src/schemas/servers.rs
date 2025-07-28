@@ -103,7 +103,7 @@ pub struct ServerDetail {
     pub tags: Option<Vec<String>>,
     /// 服务器状态，显示服务器的在线状态信息
     #[schema(example = json!(null))]
-    pub status: Option<ServerStatus>,
+    pub stats: Option<ServerStats>,
     /// 服务器权限，服务器的权限
     #[schema(example = "guest")]
     pub permission: String,
@@ -116,7 +116,7 @@ pub struct ServerDetail {
 ///
 /// 包含服务器实时状态的结构体，如在线玩家数、延迟等
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-pub struct ServerStatus {
+pub struct ServerStats {
     /// 玩家数，当前在线的玩家数量以及最大可容纳的玩家数量
     #[schema(example = json!({"online": 10, "max": 100}))]
     pub players: HashMap<String, i64>,
