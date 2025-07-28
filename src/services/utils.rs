@@ -25,13 +25,6 @@ pub async fn maintain_sentence_queue() {
     });
 }
 
-/// 立即预加载句子队列
-pub async fn preload_sentence_queue() {
-    tracing::info!("开始预加载句子队列...");
-    refill_sentence_queue().await;
-    tracing::info!("句子队列预加载完成");
-}
-
 /// 从队列中获取一个句子，如果没有则等待
 pub async fn get_sentence_from_queue() -> Value {
     let mut queue = SENTENCE_QUEUE.lock().await;

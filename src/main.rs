@@ -3,7 +3,7 @@ use server_api_rt::{
     logging::{init_logging, log_server_ready, log_shutdown},
     services::{
         redis::RedisService,
-        utils::{maintain_sentence_queue, preload_sentence_queue},
+        utils::{maintain_sentence_queue},
     },
     AppState,
 };
