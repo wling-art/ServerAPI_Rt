@@ -1,18 +1,14 @@
 use crate::config::Config;
 use anyhow::{Context, Result};
 use lettre::message::header::ContentType;
-use lettre::message::Mailbox;
 use lettre::transport::smtp::authentication::Credentials;
 use lettre::Message;
 use lettre::SmtpTransport;
 
 /// 构建邮件消息
-pub fn build_email_message(to_email: &str, from_email: &str, body: String) -> Result<Message> {
+pub fn build_email_message(to_email: &str, body: String) -> Result<Message> {
     Message::builder()
-        .from(Mailbox::new(
-            Some("MSCPO 验证系统".to_string()),
-            from_email.parse().context("解析发件人邮箱地址失败")?,
-        ))
+        .from(to_email.parse().context("解析发件人邮箱地址失败")?)
         .to(to_email.parse().context("解析收件人邮箱地址失败")?)
         .subject("邮箱验证码")
         .header(ContentType::TEXT_HTML)

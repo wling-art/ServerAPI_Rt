@@ -53,7 +53,6 @@ pub struct EmailConfig {
     pub smtp_server: String,
     pub smtp_port: u16,
     pub smtp_username: String,
-    pub from_email: String,
     pub smtp_password: String,
 }
 
@@ -121,7 +120,6 @@ impl Config {
                 .unwrap_or_else(|_| "465".to_string())
                 .parse()?,
             smtp_username: std::env::var("SMTP_USERNAME")?,
-            from_email: std::env::var("FROM_EMAIL")?,
             smtp_password: std::env::var("SMTP_PASSWORD")?,
         };
 

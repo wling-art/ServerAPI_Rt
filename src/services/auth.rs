@@ -184,7 +184,7 @@ impl AuthService {
         let redis = Self::get_redis_service()?;
 
         let email_body = template.render().context("渲染邮件模板失败")?;
-        let message = build_email_message(email, &config.email.from_email, email_body)
+        let message = build_email_message(email, email_body)
             .context("构建邮件消息失败")?;
 
         let smtp_transport = build_smtp_transport(config)?;
