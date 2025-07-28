@@ -110,33 +110,23 @@ impl RedisService {
             return Ok(vec![]);
         }
 
+        let mut results = Vec::with_capacity(keys.len());
         let mut conn = self.manager.clone();
-        let mut cmd = redis::cmd("EXISTS");
 
         for key in keys {
-            cmd.arg(key);
-        }
+            let result: RedisResult<bool> =
+                redis::cmd("EXISTS").arg(key).query_async(&mut conn).await;
 
-        let result: RedisResult<Vec<i32>> = cmd.query_async(&mut conn).await;
-
-        match result {
-            Ok(_exists_results) => {
-                // Redis EXISTS 返回存在的键的数量，但我们需要每个键的单独结果
-                // 所以需要分别查询每个键
-                let mut results = Vec::with_capacity(keys.len());
-                for key in keys {
-                    match self.exists(key).await {
-                        Ok(exists) => results.push(exists),
-                        Err(e) => {
-                            error!("检查键 {} 是否存在时失败: {}", key, e);
-                            results.push(false); // 出错时假设不存在
-                        }
-                    }
+            match result {
+                Ok(exists) => results.push(exists),
+                Err(e) => {
+                    error!("检查键 {} 是否存在时失败: {}", key, e);
+                    results.push(false);
                 }
-                Ok(results)
             }
-            Err(e) => Err(anyhow::anyhow!("Redis 批量 EXISTS 失败: {}", e)),
         }
+
+        Ok(results)
     }
 
     /// 删除键
