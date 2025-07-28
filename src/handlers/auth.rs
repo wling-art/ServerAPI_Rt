@@ -155,8 +155,8 @@ pub async fn logout(
 #[utoipa::path(
     post,
     path = "/v2/auth/register/email-code",
-    summary = "用户注册",
-    description = "使用用户名、邮箱和密码进行注册，成功后返回 JWT 访问令牌",
+    summary = "使用邮箱注册用户",
+    description = "使用邮箱注册用户，发送验证码到用户邮箱",
     tag = "auth",
     responses(
         (status = 200, description = "注册成功", body = SuccessResponse),
