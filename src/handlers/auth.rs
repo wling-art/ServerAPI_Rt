@@ -1,21 +1,21 @@
 use axum::{extract::State, http::HeaderMap, Extension, Json};
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
+use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter};
 use tokio::task;
 use validator::Validate;
 
 use crate::{
-    entities::users,
+    entities::users::{self, RoleEnum},
     errors::{ApiError, ApiErrorResponse, ApiResult},
     middleware::UserClaims,
     schemas::{
-        auth::{AuthToken, UserLoginData, UserRegisterByEmailData},
+        auth::{AuthToken, UserLoginData, UserRegisterByEmailData, UserRegisterData},
         servers::SuccessResponse,
     },
     services::auth::{AuthService, JwtData},
     AppState,
 };
 use anyhow::Context;
-use bcrypt::verify;
+use bcrypt::{hash, verify};
 
 fn get_ip(headers: &HeaderMap) -> Option<String> {
     headers
@@ -93,7 +93,7 @@ pub async fn login(
         .await
         .map_err(|_| ApiError::InternalServerError("密码校验任务失败".to_string()))?;
 
-    // TODO: 写一个 bcrypt 转 10 cost，不然 12 cost 太慢了
+    // TODO: 写一个 bcrypt 12cost 转 10 cost，不然 12 cost 太慢了
 
     match verify_result {
         Ok(true) => {
@@ -151,7 +151,7 @@ pub async fn logout(
     }
 }
 
-/// 注册
+/// 邮箱验证码
 #[utoipa::path(
     post,
     path = "/v2/auth/register/email-code",
@@ -193,5 +193,67 @@ pub async fn register_email_code(
 
     Ok(Json(SuccessResponse {
         message: format!("验证码已发送到 {}", user_data.email),
+    }))
+}
+
+#[utoipa::path(
+    post,
+    path = "/v2/auth/register",
+    summary = "用户注册",
+    description = "使用邮箱和密码注册新用户",
+    tag = "auth",
+    responses(
+        (status = 200, description = "注册成功", body = SuccessResponse),
+        (status = 400, description = "请求数据不合法", body = ApiErrorResponse),
+        (status = 400, description = "验证码无效", body = ApiErrorResponse),
+        (status = 400, description = "用户已存在", body = ApiErrorResponse),
+    )
+)]
+pub async fn register(
+    State(app_state): State<AppState>,
+    Json(user_data): Json<UserRegisterData>,
+) -> ApiResult<Json<SuccessResponse>> {
+    if let Err(e) = user_data.validate() {
+        return Err(ApiError::BadRequest(format!("请求数据不合法: {}", e)));
+    }
+
+    if AuthService::validate_email_code(&user_data.email, &user_data.code)
+        .await
+        .is_err()
+    {
+        return Err(ApiError::BadRequest("验证码无效".to_string()));
+    }
+
+    let user_exists = users::Entity::find()
+        .filter(users::Column::Email.eq(&user_data.email))
+        .one(app_state.db.as_ref())
+        .await
+        .map(|user| user.is_some())
+        .context("检查用户是否存在失败")?;
+
+    if user_exists {
+        return Err(ApiError::BadRequest("用户已存在".to_string()));
+    }
+
+    let hashed_password = hash(&user_data.password, 10)
+        .map_err(|e| ApiError::InternalServerError(format!("密码加密失败: {}", e)))?;
+
+    let new_user = users::ActiveModel {
+        username: sea_orm::Set(user_data.username),
+        email: sea_orm::Set(user_data.email),
+        hashed_password: sea_orm::Set(hashed_password),
+        display_name: sea_orm::Set(user_data.display_name),
+        role: sea_orm::Set(RoleEnum::User),
+        is_active: sea_orm::Set(true),
+        ..Default::default()
+    };
+
+    new_user
+        .insert(app_state.db.as_ref())
+        .await
+        .map_err(|e| ApiError::InternalServerError(format!("注册用户失败: {}", e)))?;
+
+    Ok(Json(SuccessResponse {
+        message: "注册成功".to_string(),
     }))
 }

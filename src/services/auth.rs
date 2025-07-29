@@ -229,6 +229,29 @@ impl AuthService {
         }
     }
 
+    /// 验证码校验
+    pub async fn validate_email_code(email: &str, code: &str) -> Result<bool> {
+        let redis = Self::get_redis_service()?;
+        let key = format!("email_code:{email}");
+
+        match redis.get(&key).await {
+            Ok(stored_code) => {
+                if let Some(stored_code) = stored_code {
+                    if stored_code == code {
+                        // 验证成功后删除验证码
+                        let _ = redis.del(&key).await;
+                        return Ok(true);
+                    }
+                }
+                Ok(false)
+            }
+            Err(e) => {
+                error!("获取验证码失败: {}", e);
+                Err(anyhow::anyhow!("获取验证码失败"))
+            }
+        }
+    }
+
     // ========== 私有辅助方法 ==========
 
     /// 获取Redis服务实例

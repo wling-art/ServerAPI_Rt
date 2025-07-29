@@ -56,6 +56,24 @@ pub struct UserRegisterData {
     #[validate(regex(path = "*USERNAME_REGEX", message = "用户名只能包含字母、数字和下划线"))]
     #[schema(example = "user123")]
     pub username: String,
+
+    /// 显示名称(长度在 2 到 16 个字符之间，可以包含中文、英文、俄文、数字、下划线和短横线)
+    #[schema(example = "张三-Mike")]
+    #[validate(length(
+        min = 2,
+        max = 16,
+        message = "显示名称不能少于 2 个字符，不能超过 16 个字符"
+    ))]
+    #[validate(regex(
+        path = "*DISPLAY_NAME_REGEX",
+        message = "显示名称只能包含中文、英文、俄文、数字、下划线和短横线"
+    ))]
+    pub display_name: String,
+
+    /// 验证码
+    #[validate(length(equal = 6, message = "验证码长度必须为 6 位"))]
+    #[schema(example = "123456")]
+    pub code: String,
 }
 
 // register by email
@@ -68,3 +86,7 @@ pub struct UserRegisterByEmailData {
 }
 
 pub static USERNAME_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"^[a-zA-Z0-9_]+$").unwrap());
+
+pub static DISPLAY_NAME_REGEX: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"^[a-zA-Zа-яА-ЯёЁ\u4e00-\u9fff][a-zA-Zа-яА-ЯёЁ\u4e00-\u9fff0-9_-]{0,28}[a-zA-Zа-яА-ЯёЁ\u4e00-\u9fff0-9]$|^[a-zA-Zа-яА-ЯёЁ\u4e00-\u9fff]$").unwrap()
+});

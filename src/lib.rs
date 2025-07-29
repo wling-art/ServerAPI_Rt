@@ -37,6 +37,7 @@ use utoipa_swagger_ui::SwaggerUi;
         servers::get_total_players,
         auth::login,
         auth::logout,
+        auth::register,
         auth::register_email_code
     ),
     components(
@@ -56,6 +57,7 @@ use utoipa_swagger_ui::SwaggerUi;
             schemas::servers::SuccessResponse,
             schemas::servers::ServerTotalPlayers,
             schemas::auth::AuthToken,
+            schemas::auth::UserRegisterData,
             entities::server::AuthModeEnum,
             entities::server::ServerTypeEnum,
             errors::ApiErrorResponse,
@@ -111,7 +113,8 @@ pub fn create_app(app_state: AppState) -> Router {
     let auth_router = Router::new()
         .route("/login", post(auth::login))
         .route("/logout", post(auth::logout))
-        .route("/register/email-code", post(auth::register_email_code));
+        .route("/register/email-code", post(auth::register_email_code))
+        .route("/register", post(auth::register));
 
     Router::new()
         .nest("/v2/servers", server_router)
