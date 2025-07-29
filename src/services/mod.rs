@@ -5,3 +5,6 @@ pub mod file_upload;
 pub mod redis;
 pub mod server;
 pub mod utils;
+pub use file_upload::FileUploadService;
+pub use redis::RedisService;
+pub use server::ServerService;

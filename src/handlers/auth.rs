@@ -189,7 +189,7 @@ pub async fn register_email_code(
 
     AuthService::send_email_code(&user_data.email, &app_state.config)
         .await
-        .map_err(|e| ApiError::InternalServerError(format!("发送验证码失败: {}", e)))?;
+        .map_err(|e| ApiError::InternalServerError(format!("发送验证码失败: {e}")))?;
 
     Ok(Json(SuccessResponse {
         message: format!("验证码已发送到 {}", user_data.email),

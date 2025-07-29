@@ -2,7 +2,7 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
-use validator::Validate;
+use validator::{Validate, ValidationError};
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct AuthToken {
     /// JWT 访问令牌
@@ -27,6 +27,17 @@ pub struct UserLoginData {
     pub password: String,
 }
 
+fn validate_password_complexity(password: &str) -> Result<(), ValidationError> {
+    let has_letter = password.chars().any(|c| c.is_ascii_alphabetic());
+    let has_digit = password.chars().any(|c| c.is_ascii_digit());
+
+    if has_letter && has_digit {
+        Ok(()) // 验证通过
+    } else {
+        Err(ValidationError::new("密码必须同时包含字母和数字"))
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Validate, Deserialize, ToSchema)]
 pub struct UserRegisterData {
     /// 邮箱
@@ -36,10 +47,7 @@ pub struct UserRegisterData {
 
     /// 密码(长度在 8 到 32 个字符之间，必须包含字母和数字)
     #[validate(length(min = 8, max = 32, message = "密码长度必须在 8 到 32 个字符之间"))]
-    #[validate(regex(
-        path = "*PASSWORD_REGEX",
-        message = "密码格式不正确，必须包含字母和数字"
-    ))]
+    #[validate(custom(function = "validate_password_complexity"))]
     #[schema(example = "Password123")]
     pub password: String,
 
@@ -58,8 +66,5 @@ pub struct UserRegisterByEmailData {
     #[schema(example = "user@example.com")]
     pub email: String,
 }
-
-pub static PASSWORD_REGEX: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]+$").unwrap());
 
 pub static USERNAME_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"^[a-zA-Z0-9_]+$").unwrap());

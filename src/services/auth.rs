@@ -14,6 +14,7 @@ use sea_orm::{ActiveModelTrait, DatabaseConnection};
 use serde::{Deserialize, Serialize};
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
+use std::sync::Arc;
 use tracing::error;
 use utoipa::{
     openapi::security::{HttpAuthScheme, HttpBuilder, SecurityScheme},
@@ -204,7 +205,7 @@ impl AuthService {
 
     /// 存储验证码到Redis
     async fn store_verification_code(redis: &RedisService, email: &str, code: &str) -> Result<()> {
-        let key = format!("email_code:{}", email);
+        let key = format!("email_code:{email}");
         redis
             .set_ex(&key, code, 300)
             .await
@@ -213,7 +214,7 @@ impl AuthService {
 
     pub async fn verify_email_code(email: &str, input_code: &str) -> Result<bool> {
         let redis = Self::get_redis_service()?;
-        let key = format!("email_code:{}", email);
+        let key = format!("email_code:{email}");
 
         match redis.get(&key).await {
             Ok(stored_code) => {
@@ -231,7 +232,7 @@ impl AuthService {
     // ========== 私有辅助方法 ==========
 
     /// 获取Redis服务实例
-    fn get_redis_service() -> Result<std::sync::Arc<RedisService>> {
+    fn get_redis_service() -> Result<Arc<RedisService>> {
         RedisService::instance().ok_or_else(|| anyhow::anyhow!("Redis服务未初始化"))
     }
 
