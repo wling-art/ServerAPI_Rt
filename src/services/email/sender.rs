@@ -6,9 +6,9 @@ use lettre::Message;
 use lettre::SmtpTransport;
 
 /// 构建邮件消息
-pub fn build_email_message(to_email: &str, body: String) -> Result<Message> {
+pub fn build_email_message(from_email: &str, to_email: &str, body: String) -> Result<Message> {
     Message::builder()
-        .from(to_email.parse().context("解析发件人邮箱地址失败")?)
+        .from(from_email.parse().context("解析发件人邮箱地址失败")?)
         .to(to_email.parse().context("解析收件人邮箱地址失败")?)
         .subject("邮箱验证码")
         .header(ContentType::TEXT_HTML)
