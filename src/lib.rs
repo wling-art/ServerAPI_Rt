@@ -10,6 +10,7 @@ use anyhow::Result;
 use std::sync::Arc;
 
 use crate::config::Config;
+use crate::handlers::search;
 use crate::handlers::{auth, servers};
 use crate::middleware::{auth::optional_auth_middleware, simple_http_logging_middleware};
 use crate::services::auth::SecurityAddon;
@@ -38,7 +39,8 @@ use utoipa_swagger_ui::SwaggerUi;
         auth::login,
         auth::logout,
         auth::register,
-        auth::register_email_code
+        auth::register_email_code,
+        search::search_server
     ),
     components(
         schemas(
@@ -58,6 +60,9 @@ use utoipa_swagger_ui::SwaggerUi;
             schemas::servers::ServerTotalPlayers,
             schemas::auth::AuthToken,
             schemas::auth::UserRegisterData,
+            schemas::search::SearchParams,
+            schemas::search::ServerResult,
+            schemas::search::SearchResponse,
             entities::server::AuthModeEnum,
             entities::server::ServerTypeEnum,
             errors::ApiErrorResponse,
@@ -80,11 +85,11 @@ impl AppState {
         let config = Arc::new(Config::from_env()?);
         let db = match establish_connection(&config.database).await {
             Ok(db) => {
-                tracing::info!("✅ 数据库初始化成功");
+                tracing::info!("数据库初始化成功");
                 db
             }
             Err(e) => {
-                tracing::error!("❌ 数据库初始化失败: {}", e);
+                tracing::error!("数据库初始化失败: {}", e);
                 return Err(e.into());
             }
         };
@@ -115,10 +120,12 @@ pub fn create_app(app_state: AppState) -> Router {
         .route("/logout", post(auth::logout))
         .route("/register/email-code", post(auth::register_email_code))
         .route("/register", post(auth::register));
+    let search_router = Router::new().route("/", get(search::search_server));
 
     Router::new()
         .nest("/v2/servers", server_router)
         .nest("/v2/auth", auth_router)
+        .nest("/v2/search", search_router)
         // Health check
         .route("/health", get(|| async { "OK" }))
         // Swagger UI

@@ -9,6 +9,7 @@ pub struct Config {
     pub redis: RedisConfig,
     pub s3: S3Config,
     pub email: EmailConfig,
+    pub meilisearch: MeilisearchConfig,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -56,10 +57,16 @@ pub struct EmailConfig {
     pub smtp_password: String,
 }
 
+#[derive(Debug, Deserialize, Clone)]
+pub struct MeilisearchConfig {
+    pub url: String,
+    pub api_key: String,
+}
 
 impl Config {
     pub fn from_env() -> Result<Self> {
         dotenvy::dotenv().ok();
+
         let database = DatabaseConfig {
             url: std::env::var("DATABASE_URL")?,
             min_connections: std::env::var("DB_MIN_CONNECTIONS")
@@ -123,6 +130,11 @@ impl Config {
             smtp_password: std::env::var("SMTP_PASSWORD")?,
         };
 
+        let meilisearch = MeilisearchConfig {
+            url: std::env::var("MEILISEARCH_URL")?,
+            api_key: std::env::var("MEILISEARCH_API_KEY")?,
+        };
+
         Ok(Config {
             database,
             server,
@@ -130,6 +142,7 @@ impl Config {
             redis,
             s3,
             email,
+            meilisearch,
         })
     }
 }

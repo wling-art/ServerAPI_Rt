@@ -20,46 +20,39 @@ use crate::{
 use rand::{rngs::StdRng, seq::SliceRandom, SeedableRng};
 
 use chrono::Utc;
+use sea_orm::JsonValue;
 use sea_orm::*;
 use sea_orm::{ActiveModelTrait, Set};
 use serde_json::Value;
 use validator::Validate;
-/// 分页结果结构体
+
 pub struct PaginatedServerResult {
-    /// 当前页的服务器列表
     pub data: Vec<ServerDetail>,
-    /// 过滤后的服务器总数
     pub total: i64,
 }
 
 pub struct ServerService;
 
 impl ServerService {
-    /// 获取带过滤条件的服务器列表 - 优化版本
     pub async fn get_servers_with_filters(
         db: &DatabaseConnection,
         user_id: Option<i32>,
         list_query: &ListQuery,
     ) -> ApiResult<PaginatedServerResult> {
-        // 构建查询，应用过滤条件
         let mut query = Server::find();
 
-        // 应用成员过滤
         if list_query.is_member {
             query = query.filter(server::Column::IsMember.eq(list_query.is_member));
         }
 
-        // 应用服务器类型过滤
         if let Some(modes) = &list_query.r#type {
             query = query.filter(server::Column::Type.is_in(modes));
         }
 
-        // 应用认证模式过滤
         if let Some(auth_modes) = &list_query.auth_mode {
             query = query.filter(server::Column::AuthMode.is_in(auth_modes));
         }
 
-        // 获取所有符合条件的服务器
         let mut servers = query
             .order_by_asc(server::Column::Id)
             .all(db.as_ref())
@@ -72,15 +65,12 @@ impl ServerService {
             });
         }
 
-        // 应用标签过滤（在应用层面，因为 JSON 字段难以在数据库层优化）
         if let Some(required_tags) = &list_query.tags {
             servers.retain(|server| Self::server_has_required_tags(&server.tags, required_tags));
         }
 
-        // 记录过滤后的总数
         let total = servers.len() as i64;
 
-        // 随机排序
         let mut rng = if let Some(seed_val) = list_query.seed {
             StdRng::seed_from_u64(seed_val as u64)
         } else {
@@ -88,7 +78,6 @@ impl ServerService {
         };
         servers.shuffle(&mut rng);
 
-        // 应用分页 - 只处理需要的数据
         let start = ((list_query.page - 1) * list_query.page_size) as usize;
         let take = list_query.page_size as usize;
 
@@ -109,14 +98,11 @@ impl ServerService {
             });
         }
 
-        // 并行执行多个数据库查询以提高性能
         let (server_statses, user_servers, cover_files) = tokio::try_join!(
-            // 查询服务器状态
             ServerStatsEntity::find()
                 .filter(server_stats::Column::ServerId.is_in(server_ids.clone()))
                 .order_by_desc(server_stats::Column::Timestamp)
                 .all(db.as_ref()),
-            // 查询用户权限
             async {
                 if let Some(uid) = user_id {
                     UserServer::find()
@@ -128,7 +114,6 @@ impl ServerService {
                     Ok(vec![])
                 }
             },
-            // 查询封面文件
             async {
                 let cover_hashes: Vec<String> = page_servers
                     .iter()
@@ -147,12 +132,10 @@ impl ServerService {
             }
         )?;
 
-        // 构建高效的映射表
         let stats_map = Self::build_stats_map(&server_statses);
         let user_permissions = Self::build_user_permissions_map(&user_servers);
         let cover_file_map = Self::build_cover_file_map(&cover_files);
 
-        // 转换为 ServerDetail
         let server_list = Self::convert_servers_to_details(
             page_servers,
             &stats_map,
@@ -166,34 +149,28 @@ impl ServerService {
         })
     }
 
-    /// 获取单个服务器的详细信息
     pub async fn get_server_detail(
         db: &DatabaseConnection,
         user_id: Option<i32>,
         server_id: i32,
         require_login: bool,
     ) -> ApiResult<ServerDetail> {
-        // 如果强制要求登录但未提供 user_id，直接返回未登录错误
         if require_login && user_id.is_none() {
             return Err(crate::errors::ApiError::Unauthorized(
                 "未登录，禁止访问".to_string(),
             ));
         }
 
-        // 查询服务器基本信息
         let server = Server::find_by_id(server_id)
             .one(db.as_ref())
             .await?
             .ok_or_else(|| crate::errors::ApiError::NotFound("服务器不存在".to_string()))?;
 
-        // 并行执行多个数据库查询
         let (server_stats, user_server, cover_file) = tokio::try_join!(
-            // 查询最新的服务器状态
             ServerStatsEntity::find()
                 .filter(server_stats::Column::ServerId.eq(server.id))
                 .order_by_desc(server_stats::Column::Timestamp)
                 .one(db.as_ref()),
-            // 查询用户权限
             async {
                 if let Some(uid) = user_id {
                     UserServer::find()
@@ -205,7 +182,6 @@ impl ServerService {
                     Ok(None)
                 }
             },
-            // 查询封面文件
             async {
                 if let Some(ref cover_hash) = server.cover_hash_id {
                     Files::find()
@@ -218,16 +194,13 @@ impl ServerService {
             }
         )?;
 
-        // user_role 处理
         let user_role = user_server.map(|us| us.role);
-        // 如果强制要求登录但 user_role 仍为 None，说明用户无权限
         if require_login && user_role.is_none() {
             return Err(crate::errors::ApiError::Unauthorized(
                 "无权限访问该服务器".to_string(),
             ));
         }
 
-        // 转换为 ServerDetail
         let stats = if let Some(stats_model) = server_stats {
             if let Some(ref stat_data) = stats_model.stat_data {
                 Self::parse_server_stats(stat_data).ok()
@@ -268,7 +241,7 @@ impl ServerService {
                 "YGGDRASIL" => ApiAuthMode::Yggdrasil,
                 _ => ApiAuthMode::Official,
             },
-            tags: serde_json::from_str(&server.tags).unwrap_or_default(),
+            tags: Self::parse_server_tags(&server.tags),
             is_hide: server.is_hide,
             stats,
             permission: user_role.unwrap_or_else(|| "guest".to_string()),
@@ -276,19 +249,16 @@ impl ServerService {
         })
     }
 
-    /// 构建服务器状态映射表
     fn build_stats_map(
         server_statses: &[server_stats::Model],
     ) -> HashMap<i32, &server_stats::Model> {
         let mut stats_map = HashMap::new();
         for stats in server_statses {
-            // 由于已经按时间倒序排列，第一个遇到的就是最新的
             stats_map.entry(stats.server_id).or_insert(stats);
         }
         stats_map
     }
 
-    /// 构建用户权限映射表
     fn build_user_permissions_map(user_servers: &[user_server::Model]) -> HashMap<i32, String> {
         user_servers
             .iter()
@@ -296,7 +266,6 @@ impl ServerService {
             .collect()
     }
 
-    /// 构建封面文件映射表
     fn build_cover_file_map(cover_files: &[files::Model]) -> HashMap<String, String> {
         cover_files
             .iter()
@@ -304,31 +273,27 @@ impl ServerService {
             .collect()
     }
 
-    /// 检查服务器是否包含所需标签
-    fn server_has_required_tags(server_tags_json: &str, required_tags: &[String]) -> bool {
-        if server_tags_json.is_empty() {
+    fn server_has_required_tags(server_tags_json: &JsonValue, required_tags: &[String]) -> bool {
+        if server_tags_json.is_null()
+            || (server_tags_json.is_array() && server_tags_json.as_array().unwrap().is_empty())
+        {
             return false;
         }
 
-        match serde_json::from_str::<Value>(server_tags_json) {
-            Ok(json_value) => match json_value.as_array() {
-                Some(server_tags) => {
-                    let server_tag_strings: Vec<String> = server_tags
-                        .iter()
-                        .filter_map(|v| v.as_str().map(|s| s.to_string()))
-                        .collect();
-                    // 检查是否包含所需的任何一个标签
-                    required_tags
-                        .iter()
-                        .any(|required_tag| server_tag_strings.contains(required_tag))
-                }
-                None => false,
-            },
-            Err(_) => false,
+        match server_tags_json.as_array() {
+            Some(server_tags) => {
+                let server_tag_strings: Vec<String> = server_tags
+                    .iter()
+                    .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                    .collect();
+                required_tags
+                    .iter()
+                    .any(|required_tag| server_tag_strings.contains(required_tag))
+            }
+            None => false,
         }
     }
 
-    /// 将服务器模型转换为 ServerDetail
     fn convert_servers_to_details(
         servers: Vec<server::Model>,
         stats_map: &HashMap<i32, &server_stats::Model>,
@@ -338,16 +303,13 @@ impl ServerService {
         let server_list = servers
             .into_iter()
             .map(|server| {
-                // 解析 tags
                 let tags = Self::parse_server_tags(&server.tags);
 
-                // 转换类型
                 let server_type: ApiServerType =
                     server.r#type.parse().unwrap_or(ApiServerType::Java);
                 let auth_mode: ApiAuthMode =
                     server.auth_mode.parse().unwrap_or(ApiAuthMode::Official);
 
-                // 处理服务器状态
                 let stats = stats_map.get(&server.id).and_then(|stats_model| {
                     stats_model
                         .stat_data
@@ -355,13 +317,11 @@ impl ServerService {
                         .and_then(|data| Self::parse_server_stats(data).ok())
                 });
 
-                // 获取用户权限
                 let permission = user_permissions
                     .get(&server.id)
                     .cloned()
                     .unwrap_or_else(|| "guest".to_string());
 
-                // 生成封面URL
                 let cover_url = Self::build_cover_url(&server.cover_hash_id, cover_file_map);
 
                 ServerDetail {
@@ -390,23 +350,18 @@ impl ServerService {
         Ok(server_list)
     }
 
-    /// 解析服务器标签
-    fn parse_server_tags(tags_json: &str) -> Option<Vec<String>> {
-        if tags_json.is_empty() {
+    fn parse_server_tags(tags_json: &JsonValue) -> Option<Vec<String>> {
+        if tags_json.is_null() {
             return None;
         }
 
-        match serde_json::from_str::<Value>(tags_json) {
-            Ok(json_value) => json_value.as_array().map(|arr| {
-                arr.iter()
-                    .filter_map(|v| v.as_str().map(|s| s.to_string()))
-                    .collect()
-            }),
-            Err(_) => None,
-        }
+        tags_json.as_array().map(|arr| {
+            arr.iter()
+                .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                .collect()
+        })
     }
 
-    /// 构建封面URL
     fn build_cover_url(
         cover_hash: &Option<String>,
         cover_file_map: &HashMap<String, String>,
@@ -417,7 +372,6 @@ impl ServerService {
             .cloned()
     }
 
-    /// 构建图片URL
     fn build_image_url(file_path: &str) -> String {
         if file_path.starts_with("http://") || file_path.starts_with("https://") {
             file_path.to_string()
@@ -426,7 +380,6 @@ impl ServerService {
         }
     }
 
-    /// 解析服务器状态JSON为ServerStatsEntity结构
     fn parse_server_stats(stat_data: &Value) -> ApiResult<ServerStats> {
         let players = stat_data
             .get("players")
@@ -490,7 +443,6 @@ impl ServerService {
         })
     }
 
-    /// 更新服务器信息
     pub async fn update_server_by_id(
         db: &DatabaseConnection,
         s3_config: &crate::config::S3Config,
@@ -498,17 +450,14 @@ impl ServerService {
         update_data: UpdateServerRequest,
         current_user_id: i32,
     ) -> ApiResult<ServerDetail> {
-        // 检查服务器是否存在
         let server = Server::find_by_id(server_id)
             .one(db.as_ref())
             .await
             .map_err(|e| crate::errors::ApiError::Database(e.to_string()))?
             .ok_or_else(|| crate::errors::ApiError::NotFound("未找到该服务器".to_string()))?;
 
-        // 检查用户权限
         Self::check_server_edit_permission(db, server_id, current_user_id).await?;
 
-        // 验证更新字段不能为空
         if update_data.name.trim().is_empty()
             && update_data.ip.trim().is_empty()
             && update_data.desc.trim().is_empty()
@@ -518,12 +467,10 @@ impl ServerService {
             ));
         }
 
-        // 执行各项验证
         update_data
             .validate()
             .map_err(|e| crate::errors::ApiError::BadRequest(format!("参数验证失败: {e}")))?;
 
-        // 处理封面文件上传
         let original_cover_hash = server.cover_hash_id.clone();
         let cover_hash = if let Some(ref cover_data) = update_data.cover {
             let filename = cover_data
@@ -543,11 +490,9 @@ impl ServerService {
             original_cover_hash
         };
 
-        // 序列化标签为 JSON
-        let tags_json = serde_json::to_string(&update_data.tags)
+        let tags_json = serde_json::to_value(&update_data.tags)
             .map_err(|e| crate::errors::ApiError::Internal(format!("标签序列化失败: {e}")))?;
 
-        // 更新服务器信息
         let mut server_active: server::ActiveModel = server.into();
         server_active.name = Set(update_data.name.clone());
         server_active.ip = Set(update_data.ip.clone());
@@ -564,17 +509,14 @@ impl ServerService {
             .await
             .map_err(|e| crate::errors::ApiError::Database(e.to_string()))?;
 
-        // 返回更新后的服务器详情
         Self::get_server_detail(db, Some(current_user_id), updated_server.id, true).await
     }
 
-    /// 检查用户是否有权限编辑服务器
     async fn check_server_edit_permission(
         db: &DatabaseConnection,
         server_id: i32,
         user_id: i32,
     ) -> ApiResult<()> {
-        // 查询用户在该服务器的权限
         let user_server = UserServer::find()
             .filter(user_server::Column::UserId.eq(user_id))
             .filter(user_server::Column::ServerId.eq(server_id))
@@ -584,7 +526,6 @@ impl ServerService {
 
         match user_server {
             Some(us) => {
-                // 检查是否有编辑权限
                 if us.role == "admin" || us.role == "owner" {
                     Ok(())
                 } else {
@@ -599,19 +540,16 @@ impl ServerService {
         }
     }
 
-    /// 获取服务器相册
     pub async fn get_server_gallery(
         db: &DatabaseConnection,
         server_id: i32,
     ) -> ApiResult<ServerGallery> {
-        // 验证server_id参数
         if server_id <= 0 {
             return Err(crate::errors::ApiError::BadRequest(
                 "服务器ID必须大于0".to_string(),
             ));
         }
 
-        // 查找服务器是否存在
         let server = Server::find_by_id(server_id)
             .one(db.as_ref())
             .await
@@ -624,7 +562,6 @@ impl ServerService {
                 crate::errors::ApiError::NotFound("服务器不存在".to_string())
             })?;
 
-        // 获取服务器关联的相册图片列表
         let gallery_images = Self::get_server_gallery_images(db, &server).await?;
 
         tracing::info!(
@@ -640,12 +577,10 @@ impl ServerService {
         })
     }
 
-    /// 获取服务器相册图片列表
     async fn get_server_gallery_images(
         db: &DatabaseConnection,
         server: &server::Model,
     ) -> ApiResult<Vec<GalleryImage>> {
-        // 如果服务器没有关联相册，返回空列表
         let gallery_id = match server.gallery_id {
             Some(id) => {
                 tracing::debug!(
@@ -661,7 +596,6 @@ impl ServerService {
             }
         };
 
-        // 查询相册下的所有图片
         let gallery_images = GalleryImageEntity::find()
             .filter(gallery_image::Column::GalleryId.eq(gallery_id))
             .all(db.as_ref())
@@ -682,13 +616,11 @@ impl ServerService {
             gallery_images.len()
         );
 
-        // 收集所有图片hash用于批量查询文件信息
         let image_hashes: Vec<String> = gallery_images
             .iter()
             .map(|img| img.image_hash_id.clone())
             .collect();
 
-        // 批量查询文件信息
         let image_files = Files::find()
             .filter(files::Column::HashValue.is_in(image_hashes.clone()))
             .all(db.as_ref())
@@ -698,13 +630,11 @@ impl ServerService {
                 crate::errors::ApiError::Database(format!("查询图片文件失败: {e}"))
             })?;
 
-        // 构建文件映射表
         let file_map: HashMap<String, String> = image_files
             .iter()
             .map(|file_model| (file_model.hash_value.clone(), file_model.file_path.clone()))
             .collect();
 
-        // 构建返回数据
         let mut gallery_list = Vec::new();
         let mut missing_files = Vec::new();
 
@@ -739,25 +669,21 @@ impl ServerService {
         Ok(gallery_list)
     }
 
-    /// 获取服务器管理员列表
     pub async fn get_server_managers(
         db: &DatabaseConnection,
         server_id: i32,
     ) -> ApiResult<ServerManagersResponse> {
-        // 首先验证服务器是否存在
         let _server = Server::find_by_id(server_id)
             .one(db.as_ref())
             .await?
             .ok_or_else(|| crate::errors::ApiError::NotFound("服务器不存在".to_string()))?;
 
-        // 查询服务器的管理员关系，同时关联用户信息
         let managers = UserServer::find()
             .filter(user_server::Column::ServerId.eq(server_id))
             .find_also_related(Users)
             .all(db.as_ref())
             .await?;
 
-        // 收集所有的头像hash，用于批量查询文件信息
         let avatar_hashes: Vec<String> = managers
             .iter()
             .filter_map(|(_, user_opt)| {
@@ -767,7 +693,6 @@ impl ServerService {
             })
             .collect();
 
-        // 批量查询头像文件信息
         let avatar_files = if !avatar_hashes.is_empty() {
             Files::find()
                 .filter(files::Column::HashValue.is_in(avatar_hashes))
@@ -777,7 +702,6 @@ impl ServerService {
             vec![]
         };
 
-        // 构建头像文件映射表
         let avatar_file_map: HashMap<String, String> = avatar_files
             .iter()
             .map(|file_model| (file_model.hash_value.clone(), file_model.file_path.clone()))
@@ -788,7 +712,6 @@ impl ServerService {
 
         for (user_server_relation, user_opt) in managers {
             if let Some(user) = user_opt {
-                // 构建头像URL
                 let avatar_url = if let Some(avatar_hash_id) = &user.avatar_hash_id {
                     let file_path = avatar_file_map.get(avatar_hash_id).ok_or_else(|| {
                         crate::errors::ApiError::Internal(format!(
@@ -806,7 +729,7 @@ impl ServerService {
                 let role = match user_server_relation.role.as_str() {
                     "owner" => ServerManagerRole::Owner,
                     "admin" => ServerManagerRole::Admin,
-                    _ => continue, // 跳过未知角色
+                    _ => continue,
                 };
 
                 let manager_info = ManagerInfo {
@@ -826,7 +749,6 @@ impl ServerService {
         Ok(ServerManagersResponse { owners, admins })
     }
 
-    /// 检查用户是否有服务器的编辑权限（返回bool值）
     pub async fn has_server_edit_permission(
         db: &DatabaseConnection,
         user_id: i32,
@@ -843,26 +765,22 @@ impl ServerService {
         Ok(user_server.is_some())
     }
 
-    /// 添加服务器画册图片
     pub async fn add_gallery_image(
         db: &DatabaseConnection,
         s3_config: &S3Config,
         server_id: i32,
         gallery_data: &GalleryImageSchema,
     ) -> ApiResult<()> {
-        // 查找是否有这个服务器
         let server = Server::find_by_id(server_id)
             .one(db.as_ref())
             .await
             .map_err(|e| crate::errors::ApiError::Database(e.to_string()))?
             .ok_or_else(|| crate::errors::ApiError::NotFound("服务器不存在".to_string()))?;
 
-        // 验证标题和描述
         gallery_data
             .validate()
             .map_err(|e| crate::errors::ApiError::BadRequest(format!("参数验证失败: {e}")))?;
 
-        // 创建图库（如果不存在）
         let gallery_id = if let Some(gallery_id) = server.gallery_id {
             gallery_id
         } else {
@@ -875,7 +793,6 @@ impl ServerService {
                 .await
                 .map_err(|e| crate::errors::ApiError::Database(e.to_string()))?;
 
-            // 更新服务器的gallery_id
             let mut server_active: server::ActiveModel = server.into();
             server_active.gallery_id = Set(Some(gallery.id));
             Server::update(server_active)
@@ -886,7 +803,6 @@ impl ServerService {
             gallery.id
         };
 
-        // 验证并上传图片
         let image_content = gallery_data.image.contents.to_vec();
         let filename = gallery_data
             .image
@@ -899,7 +815,6 @@ impl ServerService {
             FileUploadService::validate_and_upload_gallery(db, s3_config, image_content, filename)
                 .await?;
 
-        // 创建图片记录
         let gallery_image = gallery_image::ActiveModel {
             gallery_id: Set(gallery_id),
             title: Set(gallery_data.title.clone()),
@@ -916,7 +831,6 @@ impl ServerService {
         Ok(())
     }
 
-    /// 删除服务器画册图片
     pub async fn delete_gallery_image(
         db: &DatabaseConnection,
         s3_config: &S3Config,
@@ -925,42 +839,35 @@ impl ServerService {
     ) -> ApiResult<()> {
         use crate::services::file_upload::FileUploadService;
 
-        // 查找服务器是否存在
         let server = Server::find_by_id(server_id)
             .one(db.as_ref())
             .await
             .map_err(|e| crate::errors::ApiError::Database(e.to_string()))?
             .ok_or_else(|| crate::errors::ApiError::NotFound("服务器不存在".to_string()))?;
 
-        // 检查服务器是否有画册
         let gallery_id = server
             .gallery_id
             .ok_or_else(|| crate::errors::ApiError::NotFound("该服务器没有画册".to_string()))?;
 
-        // 查找要删除的图片
         let gallery_image = GalleryImageEntity::find_by_id(image_id)
             .one(db.as_ref())
             .await
             .map_err(|e| crate::errors::ApiError::Database(e.to_string()))?
             .ok_or_else(|| crate::errors::ApiError::NotFound("图片不存在".to_string()))?;
 
-        // 检查图片是否属于该服务器的画册
         if gallery_image.gallery_id != gallery_id {
             return Err(crate::errors::ApiError::Forbidden(
                 "图片不属于该服务器".to_string(),
             ));
         }
 
-        // 删除S3中的文件
         FileUploadService::delete_file(s3_config, &gallery_image.image_hash_id).await?;
 
-        // 删除文件记录
         Files::delete_by_id(&gallery_image.image_hash_id)
             .exec(db.as_ref())
             .await
             .map_err(|e| crate::errors::ApiError::Database(e.to_string()))?;
 
-        // 删除图片记录
         GalleryImageEntity::delete_by_id(image_id)
             .exec(db.as_ref())
             .await
@@ -969,7 +876,6 @@ impl ServerService {
         Ok(())
     }
 
-    /// 获取所有服务器的玩家总数
     pub async fn total_players(
         db: &DatabaseConnection,
     ) -> ApiResult<crate::schemas::servers::ServerTotalPlayers> {
@@ -984,7 +890,6 @@ impl ServerService {
 
         for server_stats in server_statses {
             if let Some(stat_data) = &server_stats.stat_data {
-                // 解析 JSON 数据中的玩家信息
                 if let Some(players_obj) = stat_data.get("players") {
                     if let Some(online_players) = players_obj.get("online") {
                         if let Some(online_count) = online_players.as_i64() {

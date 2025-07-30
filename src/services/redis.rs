@@ -29,7 +29,7 @@ impl RedisService {
             format!("redis://{}:{}", config.host, config.port)
         };
 
-        tracing::info!("🔗 连接到 Redis: {}:{}", config.host, config.port);
+        tracing::info!("连接到 Redis: {}:{}", config.host, config.port);
 
         let client = Client::open(redis_url)?;
         let manager = ConnectionManager::new(client).await?;

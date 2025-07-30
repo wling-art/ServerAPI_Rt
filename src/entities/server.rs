@@ -41,8 +41,8 @@ pub struct Model {
     pub is_member: bool,
     pub is_hide: bool,
     pub auth_mode: String,
-    #[sea_orm(column_type = "custom(\"LONGTEXT\")")]
-    pub tags: String,
+    #[sea_orm(column_type = "custom(\"LONGTEXT\")", format = "json")]
+    pub tags: Json,
     pub cover_hash_id: Option<String>,
     pub gallery_id: Option<i32>,
 }

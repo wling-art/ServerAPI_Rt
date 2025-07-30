@@ -3,6 +3,7 @@ pub mod database;
 pub mod email;
 pub mod file_upload;
 pub mod redis;
+pub mod search;
 pub mod server;
 pub mod utils;
 pub use file_upload::FileUploadService;
