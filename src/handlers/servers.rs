@@ -38,11 +38,11 @@ pub struct ListQuery {
     #[schema(example = true, default = true)]
     #[serde(default = "default_is_member")]
     pub is_member: bool,
-    /// 服务器类型-筛选
+    /// 服务器类型
     #[schema(example = json!(["JAVA", "BEDROCK"]))]
     #[serde(default)]
     pub r#type: Option<Vec<String>>,
-    /// 认证方式-筛选
+    /// 认证方式
     #[schema(example = json!(["OFFLINE!", "OFFICIAL", "YGGDRASIL"]))]
     #[serde(default)]
     pub auth_mode: Option<Vec<String>>,
